@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 即時語音翻譯</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;700;900&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --card: #1a1a26;
+    --border: #2a2a3e;
+    --accent-zh: #00e5ff;
+    --accent-vn: #ff6b35;
+    --accent-th: #ffd700;
+    --accent-id: #4caf50;
+    --accent-en: #a78bfa;
+    --text: #e8e8f0;
+    --text-dim: #6b6b8a;
+    --glow: 0 0 20px rgba(0,229,255,0.3);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+  }
+
+  /* Ambient background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(ellipse at 20% 20%, rgba(0,229,255,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(167,139,250,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(255,107,53,0.02) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 860px;
+    padding: 40px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+  }
+
+  .logo-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    position: relative;
+  }
+
+  .logo-icon svg { width: 100%; height: 100%; }
+
+  h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: clamp(18px, 3vw, 24px);
+    font-weight: 700;
+    color: var(--accent-zh);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  /* Language selector */
+  .lang-selector {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  @media (min-width: 500px) {
+    .lang-selector { grid-template-columns: repeat(4, 1fr); }
+  }
+
+  .lang-btn {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 10px;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  .lang-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.25s;
+    border-radius: 12px;
+  }
+
+  .lang-btn:hover { transform: translateY(-2px); }
+
+  .lang-btn.active {
+    border-color: currentColor;
+    transform: translateY(-2px);
+  }
+
+  .lang-btn.active::before { opacity: 1; }
+
+  /* Individual accent colors */
+  .lang-btn[data-pair="zh-vi"] { color: var(--accent-vn); }
+  .lang-btn[data-pair="zh-vi"]::before { background: rgba(255,107,53,0.08); }
+  .lang-btn[data-pair="zh-vi"].active { box-shadow: 0 0 20px rgba(255,107,53,0.2); }
+
+  .lang-btn[data-pair="zh-th"] { color: var(--accent-th); }
+  .lang-btn[data-pair="zh-th"]::before { background: rgba(255,215,0,0.06); }
+  .lang-btn[data-pair="zh-th"].active { box-shadow: 0 0 20px rgba(255,215,0,0.15); }
+
+  .lang-btn[data-pair="zh-id"] { color: var(--accent-id); }
+  .lang-btn[data-pair="zh-id"]::before { background: rgba(76,175,80,0.08); }
+  .lang-btn[data-pair="zh-id"].active { box-shadow: 0 0 20px rgba(76,175,80,0.2); }
+
+  .lang-btn[data-pair="zh-en"] { color: var(--accent-en); }
+  .lang-btn[data-pair="zh-en"]::before { background: rgba(167,139,250,0.08); }
+  .lang-btn[data-pair="zh-en"].active { box-shadow: 0 0 20px rgba(167,139,250,0.2); }
+
+  .lang-flag { font-size: 26px; display: block; margin-bottom: 6px; }
+  .lang-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; display: block; color: inherit; }
+  .lang-desc { font-size: 10px; color: var(--text-dim); display: block; margin-top: 2px; }
+
+  /* Main panel */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  @media (min-width: 600px) {
+    .panels { grid-template-columns: 1fr 1fr; }
+  }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    min-height: 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  .panel-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+
+  .panel.source .panel-dot { background: var(--accent-zh); box-shadow: 0 0 8px var(--accent-zh); }
+
+  .panel-content {
+    flex: 1;
+    font-size: clamp(16px, 2.5vw, 20px);
+    line-height: 1.7;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .panel-content.placeholder { color: var(--text-dim); font-size: 14px; font-style: italic; }
+
+  /* Subtitle / translation accent bar */
+  .panel.translated {
+    border-color: transparent;
+    position: relative;
+  }
+
+  .panel.translated::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: var(--tl-color, var(--accent-zh));
+    box-shadow: 0 0 10px var(--tl-color, var(--accent-zh));
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+
+  /* Subtitle display */
+  .subtitle-display {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .subtitle-display::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,229,255,0.02) 0%, transparent 60%);
+  }
+
+  .subtitle-zh {
+    font-size: clamp(18px, 3vw, 26px);
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    line-height: 1.5;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.8), 0 0 20px var(--accent-zh);
+    min-height: 1.5em;
+    transition: all 0.3s ease;
+  }
+
+  .subtitle-divider {
+    width: 60px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--tl-color, var(--accent-zh)), transparent);
+    transition: background 0.3s;
+  }
+
+  .subtitle-tl {
+    font-size: clamp(16px, 2.5vw, 22px);
+    font-weight: 400;
+    color: var(--tl-color, var(--accent-zh));
+    text-align: center;
+    line-height: 1.5;
+    text-shadow: 0 0 12px var(--tl-color, var(--accent-zh));
+    min-height: 1.5em;
+    transition: all 0.3s ease, color 0.3s;
+  }
+
+  /* Control area */
+  .controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .record-btn {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    background: var(--card);
+    border: 2px solid var(--accent-zh);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    outline: none;
+  }
+
+  .record-btn:hover { transform: scale(1.05); }
+
+  .record-btn.recording {
+    background: rgba(0,229,255,0.1);
+    border-color: var(--accent-zh);
+    animation: pulse-ring 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(0,229,255,0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(0,229,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(0,229,255,0); }
+  }
+
+  .record-icon { width: 32px; height: 32px; transition: all 0.2s; }
+
+  .record-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  /* Status bar */
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .status-indicator {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+  }
+
+  .status-indicator.active {
+    background: #00ff88;
+    box-shadow: 0 0 8px #00ff88;
+    animation: blink 1s ease-in-out infinite;
+  }
+
+  .status-indicator.error { background: #ff4444; box-shadow: 0 0 8px #ff4444; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Sound wave animation */
+  .wave {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 28px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .wave.active { opacity: 1; }
+
+  .wave-bar {
+    width: 3px;
+    border-radius: 2px;
+    background: var(--accent-zh);
+    animation: wave-anim 0.8s ease-in-out infinite;
+  }
+  .wave-bar:nth-child(1) { height: 8px; animation-delay: 0s; }
+  .wave-bar:nth-child(2) { height: 18px; animation-delay: 0.1s; }
+  .wave-bar:nth-child(3) { height: 24px; animation-delay: 0.2s; }
+  .wave-bar:nth-child(4) { height: 16px; animation-delay: 0.15s; }
+  .wave-bar:nth-child(5) { height: 10px; animation-delay: 0.05s; }
+
+  @keyframes wave-anim {
+    0%, 100% { transform: scaleY(0.5); }
+    50% { transform: scaleY(1); }
+  }
+
+  /* Thinking animation for translated panel */
+  .thinking-dots {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .thinking-dots span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--tl-color, var(--accent-zh));
+    animation: dot-bounce 1.2s ease-in-out infinite;
+    display: inline-block;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes dot-bounce {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Error notice */
+  .error-notice {
+    background: rgba(255,68,68,0.1);
+    border: 1px solid rgba(255,68,68,0.3);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #ff8888;
+    display: none;
+  }
+
+
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-line">
+      <div class="logo-icon">
+        <svg viewBox="0 0 36 36" fill="none">
+          <circle cx="18" cy="18" r="17" stroke="#00e5ff" stroke-width="1.5" opacity="0.4"/>
+          <path d="M10 18 Q14 10 18 18 Q22 26 26 18" stroke="#00e5ff" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="18" cy="18" r="3" fill="#00e5ff"/>
+        </svg>
+      </div>
+      <h1>VoiceSync AI</h1>
+    </div>
+    <p class="subtitle">即時語音辨識 × AI 翻譯 × 雙語字幕</p>
+  </header>
+
+  <!-- API 由後端代理處理，Key 不暴露在前端 -->
+
+  <!-- Language Selection -->
+  <div class="lang-selector">
+    <button class="lang-btn active" data-pair="zh-vi" onclick="selectPair(this)">
+      <span class="lang-flag">🇻🇳</span>
+      <span class="lang-label">中 → 越</span>
+      <span class="lang-desc">繁中 ↔ Tiếng Việt</span>
+    </button>
+    <button class="lang-btn" data-pair="zh-th" onclick="selectPair(this)">
+      <span class="lang-flag">🇹🇭</span>
+      <span class="lang-label">中 → 泰</span>
+      <span class="lang-desc">繁中 ↔ ภาษาไทย</span>
+    </button>
+    <button class="lang-btn" data-pair="zh-id" onclick="selectPair(this)">
+      <span class="lang-flag">🇮🇩</span>
+      <span class="lang-label">中 → 印尼</span>
+      <span class="lang-desc">繁中 ↔ Bahasa</span>
+    </button>
+    <button class="lang-btn" data-pair="zh-en" onclick="selectPair(this)">
+      <span class="lang-flag">🇬🇧</span>
+      <span class="lang-label">中 → 英</span>
+      <span class="lang-desc">繁中 ↔ English</span>
+    </button>
+  </div>
+
+  <!-- Transcript panels -->
+  <div class="panels">
+    <div class="panel source">
+      <div class="panel-header">
+        <div class="panel-dot"></div>
+        原文辨識（中文）
+      </div>
+      <div class="panel-content placeholder" id="sourceText">請點擊「開始錄音」說話…</div>
+    </div>
+    <div class="panel translated" id="translatedPanel">
+      <div class="panel-header">
+        <div class="panel-dot" id="tlDot" style="background:var(--accent-vn);box-shadow:0 0 8px var(--accent-vn)"></div>
+        <span id="tlHeader">翻譯（越南語）</span>
+      </div>
+      <div class="panel-content placeholder" id="translatedText">翻譯結果將顯示於此…</div>
+    </div>
+  </div>
+
+  <!-- Subtitle display -->
+  <div class="subtitle-display">
+    <div class="subtitle-zh" id="subZh">—</div>
+    <div class="subtitle-divider" id="subDivider"></div>
+    <div class="subtitle-tl" id="subTl">—</div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="wave" id="wave">
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+      <div class="wave-bar"></div>
+    </div>
+    <button class="record-btn" id="recordBtn" onclick="toggleRecording()">
+      <svg class="record-icon" id="recordIcon" viewBox="0 0 32 32" fill="none">
+        <rect x="11" y="5" width="10" height="16" rx="5" fill="#00e5ff"/>
+        <path d="M6 16c0 5.523 4.477 10 10 10s10-4.477 10-10" stroke="#00e5ff" stroke-width="2" stroke-linecap="round"/>
+        <line x1="16" y1="26" x2="16" y2="30" stroke="#00e5ff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </button>
+    <div class="record-label" id="recordLabel">點擊開始錄音</div>
+    <div class="status-bar">
+      <div class="status-indicator" id="statusDot"></div>
+      <span id="statusText">就緒</span>
+    </div>
+  </div>
+
+  <!-- Error notice -->
+  <div class="error-notice" id="errorNotice"></div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let currentPair = 'zh-vi';
+let isRecording = false;
+let recognition = null;
+let translateTimeout = null;
+let lastTranslatedText = '';
+
+const PAIR_CONFIG = {
+  'zh-vi': { label: '翻譯（越南語）', color: 'var(--accent-vn)', rawColor: '#ff6b35', target: '越南語（Tiếng Việt）', prompt: 'Translate the following Traditional Chinese text to Vietnamese.' },
+  'zh-th': { label: '翻譯（泰語）', color: 'var(--accent-th)', rawColor: '#ffd700', target: '泰語（ภาษาไทย）', prompt: 'Translate the following Traditional Chinese text to Thai.' },
+  'zh-id': { label: '翻譯（印尼語）', color: 'var(--accent-id)', rawColor: '#4caf50', target: '印尼語（Bahasa Indonesia）', prompt: 'Translate the following Traditional Chinese text to Indonesian (Bahasa Indonesia).' },
+  'zh-en': { label: '翻譯（英語）', color: 'var(--accent-en)', rawColor: '#a78bfa', target: '英語（English）', prompt: 'Translate the following Traditional Chinese text to English.' },
+};
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+window.onload = () => {
+  applyPairColors();
+};
+
+// ─── Language pair ────────────────────────────────────────────────────────────
+function selectPair(btn) {
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentPair = btn.dataset.pair;
+  applyPairColors();
+  // Reset panels
+  setPlaceholderText('translatedText', '翻譯結果將顯示於此…');
+  updateSubtitles('—', '—');
+}
+
+function applyPairColors() {
+  const cfg = PAIR_CONFIG[currentPair];
+  document.getElementById('tlHeader').textContent = cfg.label;
+  document.getElementById('tlDot').style.cssText = `background:${cfg.color};box-shadow:0 0 8px ${cfg.color}`;
+  document.getElementById('translatedPanel').style.setProperty('--tl-color', cfg.color);
+  document.getElementById('subTl').style.color = cfg.color;
+  document.getElementById('subTl').style.textShadow = `0 0 12px ${cfg.color}`;
+  document.getElementById('subDivider').style.background = `linear-gradient(90deg, transparent, ${cfg.rawColor}, transparent)`;
+  document.documentElement.style.setProperty('--tl-color', cfg.color);
+}
+
+// ─── Recording ────────────────────────────────────────────────────────────────
+function toggleRecording() {
+  if (isRecording) stopRecording();
+  else startRecording();
+}
+
+function startRecording() {
+  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    showError('您的瀏覽器不支援語音辨識。請使用 Chrome 或 Edge。');
+    return;
+  }
+  hideError();
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SR();
+  recognition.lang = 'zh-TW';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isRecording = true;
+    document.getElementById('recordBtn').classList.add('recording');
+    document.getElementById('recordLabel').textContent = '點擊停止錄音';
+    document.getElementById('wave').classList.add('active');
+    document.getElementById('statusDot').classList.add('active');
+    setStatus('正在聆聽…', true);
+    setPlaceholderText('sourceText', '');
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t;
+      else interim += t;
+    }
+    const display = final || interim;
+    if (display) {
+      document.getElementById('sourceText').textContent = display;
+      document.getElementById('sourceText').classList.remove('placeholder');
+      updateSubtitles(display, null);
+    }
+    if (final && final.trim()) {
+      scheduleTranslation(final.trim());
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'not-allowed') showError('麥克風權限被拒絕，請允許麥克風存取。');
+    else if (e.error !== 'no-speech') showError('語音辨識錯誤：' + e.error);
+  };
+
+  recognition.onend = () => {
+    if (isRecording) recognition.start(); // auto-restart
+  };
+
+  recognition.start();
+}
+
+function stopRecording() {
+  isRecording = false;
+  if (recognition) { recognition.onend = null; recognition.stop(); recognition = null; }
+  document.getElementById('recordBtn').classList.remove('recording');
+  document.getElementById('recordLabel').textContent = '點擊開始錄音';
+  document.getElementById('wave').classList.remove('active');
+  document.getElementById('statusDot').classList.remove('active');
+  setStatus('已停止', false);
+}
+
+// ─── Translation ──────────────────────────────────────────────────────────────
+function scheduleTranslation(text) {
+  clearTimeout(translateTimeout);
+  translateTimeout = setTimeout(() => translateText(text), 600);
+}
+
+async function translateText(text) {
+  if (text === lastTranslatedText) return;
+  lastTranslatedText = text;
+
+  const cfg = PAIR_CONFIG[currentPair];
+  setStatus('AI 翻譯中…', true);
+  showThinking();
+
+  try {
+    // 呼叫 Netlify Function 代理，API Key 安全存在伺服器端
+    const res = await fetch('/.netlify/functions/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: 'You are a professional translator. Only output the translation, nothing else. No explanations, no preamble.' },
+          { role: 'user', content: `${cfg.prompt}\n\nText: ${text}` }
+        ]
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || res.statusText);
+    }
+
+    const translation = data.choices?.[0]?.message?.content?.trim() || '';
+    if (translation) {
+      document.getElementById('translatedText').textContent = translation;
+      document.getElementById('translatedText').classList.remove('placeholder');
+      updateSubtitles(text, translation);
+      setStatus('翻譯完成 ✓', false);
+      hideError();
+    }
+  } catch (err) {
+    showError('翻譯失敗：' + err.message);
+    setStatus('翻譯失敗', false);
+    document.getElementById('statusDot').classList.add('error');
+  }
+}
+
+// ─── UI Helpers ───────────────────────────────────────────────────────────────
+function updateSubtitles(zh, tl) {
+  if (zh !== null) document.getElementById('subZh').textContent = zh || '—';
+  if (tl !== null) document.getElementById('subTl').textContent = tl || '—';
+  else if (tl === null && zh) {
+    // keep previous translation visible
+  }
+}
+
+function showThinking() {
+  document.getElementById('translatedText').innerHTML = '<span class="thinking-dots"><span></span><span></span><span></span></span>';
+  document.getElementById('translatedText').classList.remove('placeholder');
+  document.getElementById('subTl').innerHTML = '<span class="thinking-dots"><span></span><span></span><span></span></span>';
+}
+
+function setPlaceholderText(id, text) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  if (text) el.classList.add('placeholder');
+  else el.classList.remove('placeholder');
+}
+
+function setStatus(msg, active) {
+  document.getElementById('statusText').textContent = msg;
+  const dot = document.getElementById('statusDot');
+  dot.classList.remove('error');
+  if (active) dot.classList.add('active');
+  else dot.classList.remove('active');
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorNotice');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function hideError() {
+  document.getElementById('errorNotice').style.display = 'none';
+}
+</script>
+</body>
+</html>
