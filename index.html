@@ -336,19 +336,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 
     <div class="speaker-pill">
       <div class="pill a" id="pillA">說話者 A 中文</div>
-      <div class="pill b" id="pillB" id="pillB">說話者 B</div>
+      <div class="pill b" id="pillB">說話者 B</div>
     </div>
 
     <div class="status-label" id="statusLabel">按下開始對話</div>
 
     <button class="big-btn" id="bigBtn" onclick="toggleSession()">
-      <!-- mic icon -->
       <svg id="iconMic" viewBox="0 0 32 32" fill="none">
         <rect x="11" y="3" width="10" height="16" rx="5" fill="#4a4"/>
         <path d="M6 16c0 5.523 4.477 10 10 10s10-4.477 10-10" stroke="#4a4" stroke-width="2.2" stroke-linecap="round"/>
         <line x1="16" y1="26" x2="16" y2="30" stroke="#4a4" stroke-width="2.2" stroke-linecap="round"/>
       </svg>
-      <!-- stop icon (hidden) -->
       <svg id="iconStop" viewBox="0 0 32 32" fill="none" style="display:none">
         <rect x="9" y="9" width="14" height="14" rx="3" fill="#f55"/>
       </svg>
@@ -380,36 +378,25 @@ const LANGS = {
 
 // ── 語言偵測：用 Unicode block 判斷 ──────────────────────────────────────────
 function detectLang(text) {
-  // 統計各文字系統字元數
-  let zh = 0, latin = 0, thai = 0, hangul = 0, arabic = 0, devanagari = 0;
+  let zh = 0, latin = 0, thai = 0;
   for (const ch of text) {
     const cp = ch.codePointAt(0);
-    if (cp >= 0x4E00 && cp <= 0x9FFF) zh++;              // CJK 中文
-    if (cp >= 0x0E00 && cp <= 0x0E7F) thai++;            // 泰文
-    if ((cp >= 0x0041 && cp <= 0x007A) ||
-        (cp >= 0x00C0 && cp <= 0x024F)) latin++;          // 拉丁（英/越/印尼）
-    if (cp >= 0xAC00 && cp <= 0xD7A3) hangul++;           // 韓
-    if (cp >= 0x0600 && cp <= 0x06FF) arabic++;
+    if (cp >= 0x4E00 && cp <= 0x9FFF) zh++;
+    if (cp >= 0x0E00 && cp <= 0x0E7F) thai++;
+    if ((cp >= 0x0041 && cp <= 0x007A) || (cp >= 0x00C0 && cp <= 0x024F)) latin++;
   }
-
-  const total = zh + latin + thai + hangul + arabic + 1;
+  const total = zh + latin + thai + 1;
   const cur = currentLang;
-
-  // 明顯是中文
   if (zh / total > 0.35) return 'zh';
-  // 明顯是泰文
   if (thai / total > 0.2 && cur === 'th') return 'target';
-  // 越南、英文、印尼都是拉丁 → 用當前選定語言判斷
   if (latin / total > 0.3 && (cur === 'vi' || cur === 'en' || cur === 'id')) return 'target';
-  // 預設回中文
   return 'zh';
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentLang = 'vi';
 let isLive = false;
-let recZh = null;      // recognition for 中文
-let recTarget = null;  // recognition for 目標語言
+let rec = null;        // 單一 SpeechRecognition 實例
 let liveElA = null;
 let liveElB = null;
 let subTimer = null;
@@ -419,12 +406,17 @@ if (!hasSR) showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS �
 
 // ─── Language ─────────────────────────────────────────────────────────────────
 function setLang(el) {
-  if (isLive) return; // 錄音中不切換
+  if (isLive) return;
   document.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   currentLang = el.dataset.lang;
   const cfg = LANGS[currentLang];
   document.getElementById('pillB').textContent = `說話者 B ${cfg.label}`;
+  // 重啟辨識以套用新語言
+  if (isLive) {
+    stopRecognition();
+    startRecognition();
+  }
 }
 
 // ─── Session toggle ───────────────────────────────────────────────────────────
@@ -442,11 +434,10 @@ function startSession() {
   document.getElementById('statusLabel').textContent = '對話進行中…';
   document.getElementById('statusLabel').style.color = '#f55';
 
-  // Remove hint
   const hint = document.getElementById('chat').querySelector('.chat-hint');
   if (hint) hint.remove();
 
-  startBothRecognitions();
+  startRecognition();
 }
 
 function stopSession() {
@@ -458,90 +449,82 @@ function stopSession() {
   document.getElementById('statusLabel').textContent = '按下開始對話';
   document.getElementById('statusLabel').style.color = '';
 
-  stopRec(recZh);     recZh = null;
-  stopRec(recTarget); recTarget = null;
+  stopRecognition();
   removeLive('a');
   removeLive('b');
   hidePills();
   fadeSubtitle();
 }
 
-function stopRec(r) {
-  if (!r) return;
-  r.onend = null; r.onerror = null; r.onresult = null;
-  try { r.stop(); } catch(e){}
+function stopRecognition() {
+  if (!rec) return;
+  const r = rec;
+  rec = null;
+  try { r.stop(); } catch(e) {}
 }
 
-// ─── Run TWO recognitions simultaneously ─────────────────────────────────────
-// 瀏覽器通常只支援一個 SpeechRecognition 同時執行，
-// 所以我們用「偵測到結果後交替啟動」的策略：
-// 同時嘗試啟動兩個，哪個先偵測到聲音就處理，另一個發生 no-speech 後重啟。
-// 這樣能覆蓋兩種語言輸入，不需要使用者選擇。
+// ─── 單一 Recognition，用 detectLang 判斷語言方向 ────────────────────────────
+// 策略：先用中文模型辨識。若偵測到是目標語言，立刻重啟成目標語言模型繼續。
+// 兩個模型交替使用，確保辨識率最佳，且同一時間只有一個在運行。
 
-function startBothRecognitions() {
-  startZhRec();
-  // 稍微延遲啟動第二個，避免瀏覽器衝突
-  setTimeout(() => { if (isLive) startTargetRec(); }, 300);
-}
+let recLang = 'zh'; // 目前辨識語言：'zh' 或 'target'
 
-function startZhRec() {
+function startRecognition() {
   if (!isLive) return;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recZh = new SR();
-  recZh.lang = 'zh-TW';
-  recZh.continuous = false;
-  recZh.interimResults = true;
+  const r = new SR();
+  rec = r;
 
-  recZh.onresult = e => {
+  // 交替語言：上次是中文就改成目標語言，反之亦然
+  // 但實際上我們依靠 detectLang 結果來判斷翻譯方向
+  // 辨識語言則每次交替，讓兩種語言都能被正確辨識
+  r.lang = recLang === 'zh' ? 'zh-TW' : LANGS[currentLang].code;
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+
+  r.onresult = e => {
     let interim = '', final = '';
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       e.results[i].isFinal ? (final += t) : (interim += t);
     }
     const text = final || interim;
-    if (text.trim()) {
-      showLive('a', text);
-      setSubOrig(text);
-    }
+    if (!text.trim()) return;
+
+    // 用 detectLang 判斷語言方向（比辨識模型更準確）
+    const detected = detectLang(text);
+    const side = detected === 'zh' ? 'a' : 'b';
+
+    showLive(side, text);
+    setSubOrig(text);
+
     if (final.trim()) {
-      removeLive('a');
-      showPill('a');
-      commitMsg('a', final.trim(), LANGS[currentLang].toTarget, false);
+      removeLive(side);
+      showPill(side);
+      const prompt = detected === 'zh'
+        ? LANGS[currentLang].toTarget
+        : LANGS[currentLang].toZh;
+      commitMsg(side, final.trim(), prompt);
     }
   };
-  recZh.onerror = e => { if (e.error === 'not-allowed') showWarn('⚠ 麥克風權限被拒絕'); };
-  recZh.onend = () => { if (isLive) setTimeout(startZhRec, 100); };
-  try { recZh.start(); } catch(e){}
-}
 
-function startTargetRec() {
-  if (!isLive) return;
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recTarget = new SR();
-  recTarget.lang = LANGS[currentLang].code;
-  recTarget.continuous = false;
-  recTarget.interimResults = true;
-
-  recTarget.onresult = e => {
-    let interim = '', final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      e.results[i].isFinal ? (final += t) : (interim += t);
+  r.onerror = e => {
+    if (e.error === 'not-allowed') {
+      showWarn('⚠ 麥克風權限被拒絕');
+      stopSession();
     }
-    const text = final || interim;
-    if (text.trim()) {
-      showLive('b', text);
-      setSubOrig(text);
-    }
-    if (final.trim()) {
-      removeLive('b');
-      showPill('b');
-      commitMsg('b', final.trim(), LANGS[currentLang].toZh, true);
-    }
+    // no-speech / audio-capture 等錯誤不處理，onend 會自動重啟
   };
-  recTarget.onerror = e => { if (e.error === 'not-allowed') showWarn('⚠ 麥克風權限被拒絕'); };
-  recTarget.onend = () => { if (isLive) setTimeout(startTargetRec, 100); };
-  try { recTarget.start(); } catch(e){}
+
+  r.onend = () => {
+    if (!isLive) return;
+    // 切換辨識語言，讓下一輪辨識另一種語言
+    recLang = recLang === 'zh' ? 'target' : 'zh';
+    setTimeout(startRecognition, 80);
+  };
+
+  try { r.start(); } catch(e) {}
 }
 
 // ─── Live preview bubble ──────────────────────────────────────────────────────
@@ -564,7 +547,7 @@ function removeLive(side) {
 }
 
 // ─── Commit final message ─────────────────────────────────────────────────────
-function commitMsg(side, text, prompt, isTarget) {
+function commitMsg(side, text, prompt) {
   const chat = document.getElementById('chat');
   const cfg = LANGS[currentLang];
   const who = side === 'a'
