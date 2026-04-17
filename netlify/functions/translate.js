@@ -1,14 +1,26 @@
+const HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 exports.handler = async (event) => {
-  // Only allow POST
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+  // Handle CORS preflight
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers: HEADERS, body: '' };
   }
 
-  // API Key 存在 Netlify 環境變數，前端完全看不到
+  // Only allow POST
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers: HEADERS, body: 'Method Not Allowed' };
+  }
+
   const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
   if (!DEEPSEEK_KEY) {
     return {
       statusCode: 500,
+      headers: HEADERS,
       body: JSON.stringify({ error: 'Server missing DEEPSEEK_API_KEY env variable' })
     };
   }
@@ -34,19 +46,21 @@ exports.handler = async (event) => {
     if (!response.ok) {
       return {
         statusCode: response.status,
+        headers: HEADERS,
         body: JSON.stringify({ error: data.error?.message || 'DeepSeek API error' })
       };
     }
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: HEADERS,
       body: JSON.stringify(data)
     };
 
   } catch (err) {
     return {
       statusCode: 500,
+      headers: HEADERS,
       body: JSON.stringify({ error: err.message })
     };
   }
