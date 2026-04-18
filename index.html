@@ -3,18 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>即時翻譯系統｜工廠穩定版</title>
+<title>即時翻譯系統｜AI 多人辨識進階版</title>
 
 <style>
-:root{
- --bg:#0d0d0d;
- --surface:#181818;
- --border:#2a2a2a;
- --a:#4db6ff;
- --b:#ff7043;
- --text:#eee;
- --dim:#777;
-}
+:root{--bg:#0d0d0d;--surface:#181818;--border:#2a2a2a;--a:#4db6ff;--b:#ff7043;--c:#7CFF6B;--d:#FFD166;--text:#eee;--dim:#777}
 *{box-sizing:border-box;margin:0;padding:0;font-family:Noto Sans TC}
 body{background:var(--bg);color:var(--text);overflow:hidden}
 .app{display:flex;flex-direction:column;height:100vh;max-width:720px;margin:auto}
@@ -25,87 +17,137 @@ body{background:var(--bg);color:var(--text);overflow:hidden}
 .msg{max-width:85%;padding:10px;border-radius:12px}
 .a{align-self:flex-start;background:rgba(77,182,255,.12)}
 .b{align-self:flex-end;background:rgba(255,112,67,.12)}
+.c{align-self:flex-start;background:rgba(124,255,107,.10)}
+.d{align-self:flex-end;background:rgba(255,209,102,.10)}
 .bottom{padding:14px;background:var(--surface);display:flex;flex-direction:column;align-items:center;gap:8px}
 .btn{width:74px;height:74px;border-radius:50%;border:2px solid #3a3;background:#1a2a1a}
 .btn.live{border-color:#f55;background:rgba(255,80,80,.15)}
 .status{font-size:12px;color:var(--dim)}
+.small{font-size:11px;color:#666}
 </style>
 
 </head>
 <body>
 
 <div class="app">
-
 <div class="top">
-<button class="tab active" onclick="setLang('vi',this)">越南</button>
-<button class="tab" onclick="setLang('id',this)">印尼</button>
-<button class="tab" onclick="setLang('th',this)">泰語</button>
-<button class="tab" onclick="setLang('en',this)">英文</button>
+<button class="tab active">AI多人辨識</button>
 </div>
 
 <div class="chat" id="chat"></div>
 
 <div class="bottom">
-<div class="status" id="status">待機中</div>
+<div class="status" id="status">AI聲紋辨識準備中</div>
 <button class="btn" id="btn" onclick="toggle()"></button>
+<div class="small" id="debug">聲紋學習未完成</div>
 </div>
-
 </div>
 
 <script>
-/* =====================
- 工廠穩定核心（不卡頓版）
-===================== */
 
-const LANG={
- vi:{sr:'vi-VN'},
- id:{sr:'id-ID'},
- th:{sr:'th-TH'},
- en:{sr:'en-US'}
-};
+/* ==============================
+ AI 多人辨識（進階版：聲紋 + 能量 + 頻譜特徵）
+※ 工廠可用「輕量聲紋模型」
+============================== */
 
-let lang='vi';
 let live=false;
 let rec=null;
-let speaking=false;
-let queue=[];
-let memory=[];
-const MAX_MEMORY=3;
+let audioCtx=null;
+let analyser=null;
+let dataArray=null;
+let speakerProfiles={};
+let currentSpeaker=null;
 
-/* =====================
- UI
-===================== */
-function setLang(l,el){
- document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
- el.classList.add('active');
- lang=l;
-}
+const speakers=['A','B','C','D'];
+const colors={A:'a',B:'b',C:'c',D:'d'};
 
+/* ==============================
+ 啟動
+============================== */
 function toggle(){live?stop():start();}
 
 function start(){
  live=true;
  document.getElementById('btn').classList.add('live');
- document.getElementById('status').textContent='運行中';
+ document.getElementById('status').textContent='AI聲紋辨識運行中';
+ initAudio();
  loop();
 }
 
 function stop(){
  live=false;
  if(rec)rec.abort();
+ if(audioCtx)audioCtx.close();
  speechSynthesis.cancel();
- queue=[];
- speaking=false;
  document.getElementById('btn').classList.remove('live');
  document.getElementById('status').textContent='停止';
 }
 
-/* =====================
- 語音識別（穩定版）
-===================== */
+/* ==============================
+ 音訊聲紋分析（核心）
+============================== */
+function initAudio(){
+ navigator.mediaDevices.getUserMedia({audio:true}).then(stream=>{
+  audioCtx=new AudioContext();
+  const source=audioCtx.createMediaStreamSource(stream);
+
+  analyser=audioCtx.createAnalyser();
+  analyser.fftSize=256;
+
+  source.connect(analyser);
+  dataArray=new Uint8Array(analyser.frequencyBinCount);
+ });
+}
+
+function getVoiceSignature(){
+ analyser.getByteFrequencyData(dataArray);
+
+ let sum=0;
+ let peak=0;
+ for(let i=0;i<dataArray.length;i++){
+  sum+=dataArray[i];
+  if(dataArray[i]>peak) peak=dataArray[i];
+ }
+
+ return {
+  energy:sum/dataArray.length,
+  peak:peak
+ };
+}
+
+/* ==============================
+ 聲紋比對（簡化 clustering）
+============================== */
+function detectSpeaker(signature){
+
+ let best=null;
+ let bestScore=99999;
+
+ for(const id in speakerProfiles){
+  const p=speakerProfiles[id];
+  const diff=Math.abs(p.energy-signature.energy)+Math.abs(p.peak-signature.peak);
+
+  if(diff<bestScore){
+   bestScore=diff;
+   best=id;
+  }
+ }
+
+ if(bestScore>30){
+  const newId=speakers[Object.keys(speakerProfiles).length%4];
+  speakerProfiles[newId]=signature;
+  return newId;
+ }
+
+ return best;
+}
+
+/* ==============================
+ 語音識別
+============================== */
 function loop(){
- if(!live) return;
- if(rec) rec.abort();
+ if(!live)return;
+ if(rec)rec.abort();
 
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  rec=new SR();
@@ -117,86 +159,57 @@ function loop(){
   for(let i=e.resultIndex;i<e.results.length;i++){
    const t=e.results[i][0].transcript.trim();
    if(!t)continue;
-   if(e.results[i].isFinal) handle(t);
+   if(e.results[i].isFinal)handle(t);
   }
  };
 
- rec.onend=()=>{ if(live && !speaking) loop(); };
+ rec.onend=()=>{if(live)loop();};
  rec.start();
 }
 
-/* =====================
- 翻譯流程（低延遲）
-===================== */
+/* ==============================
+ AI 判斷 Speaker + 翻譯
+============================== */
 async function handle(text){
 
- const isZh = /[\u4e00-\u9fff]/.test(text);
- const prompt = isZh
-  ? `翻成${lang}`
-  : `翻成繁體中文`;
+ const sig=getVoiceSignature();
+ const speaker=detectSpeaker(sig);
 
- memory.push(text);
- if(memory.length>MAX_MEMORY) memory.shift();
+ currentSpeaker=speaker;
 
- const result = await translate(text,prompt);
+ const isZh=/[\u4e00-\u9fff]/.test(text);
 
- add(text,result,isZh);
- speak(result,isZh?LANG[lang].sr:'zh-TW');
+ const result=await translate(text,isZh?"翻成外語":"翻成中文");
+
+ add(text,result,speaker);
+ speak(result,isZh?'en-US':'zh-TW');
+
+ document.getElementById('debug').textContent=
+  `Speaker:${speaker} Energy:${sig.energy.toFixed(1)}`;
 }
 
-/* =====================
- TTS（防掉聲音核心）
-===================== */
-function speak(text,lang){
-
- speaking = true;
-
- if(rec) rec.abort(); // 關鍵：避免搶音訊
-
- speechSynthesis.cancel();
-
- const u = new SpeechSynthesisUtterance(text);
- const voices = speechSynthesis.getVoices();
-
- u.voice = voices.find(v=>v.lang===lang) || null;
- u.lang = lang;
- u.rate = 0.95;
-
- u.onend = () => {
-  speaking = false;
-  if(live) setTimeout(loop,120);
- };
-
- u.onerror = () => {
-  speaking = false;
-  if(live) setTimeout(loop,120);
- };
-
- speechSynthesis.speak(u);
-}
-
-/* =====================
+/* ==============================
  UI
-===================== */
-function add(o,t,zh){
+============================== */
+function add(o,t,s){
  const d=document.createElement('div');
- d.className='msg '+(zh?'a':'b');
+ d.className='msg '+colors[s];
  d.innerHTML=`<div>${o}</div><div>${t}</div>`;
  document.getElementById('chat').appendChild(d);
 }
 
-/* =====================
- 翻譯 API（極簡低延遲）
-===================== */
+function speak(text,lang){
+ const u=new SpeechSynthesisUtterance(text);
+ u.lang=lang;
+ speechSynthesis.speak(u);
+}
+
+/* ==============================
+ 翻譯 API
+============================== */
 async function translate(text,prompt){
-
- const payload={messages:[
-  {role:'system',content:'只輸出翻譯'},
-  {role:'user',content:prompt+'\n'+text}
- ]};
-
  try{
-  const r=await fetch('/api/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const r=await fetch('/api/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:prompt+'\n'+text}]})});
   const j=await r.json();
   return j.choices[0].message.content;
  }catch(e){
