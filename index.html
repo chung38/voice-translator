@@ -6,128 +6,91 @@
 <title>即時對話翻譯</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap');
-
 :root {
-  --bg: #0d0d0d;
-  --surface: #181818;
-  --border: #2e2e2e;
-  --a-color: #4db6ff;
-  --a-bg: rgba(77,182,255,0.12);
-  --b-color: #ff7043;
-  --b-bg: rgba(255,112,67,0.12);
-  --text: #efefef;
-  --text-dim: #555;
-  --text-mid: #888;
+  --bg:#0d0d0d; --surface:#181818; --border:#2e2e2e;
+  --a-color:#4db6ff; --a-bg:rgba(77,182,255,0.12);
+  --b-color:#ff7043; --b-bg:rgba(255,112,67,0.12);
+  --text:#efefef; --text-dim:#555; --text-mid:#888;
 }
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans TC','Noto Sans',sans-serif;overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:600px;margin:0 auto}
 
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-html, body { height: 100%; background: var(--bg); color: var(--text);
-  font-family: 'Noto Sans TC','Noto Sans',sans-serif; overflow: hidden; }
+.top-bar{display:flex;align-items:center;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);gap:10px;flex-shrink:0}
+.lang-tabs{display:flex;gap:6px;flex:1;flex-wrap:wrap}
+.lang-tab{background:transparent;border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;color:var(--text-mid);transition:all .2s;white-space:nowrap}
+.lang-tab.active{border-color:var(--a-color);color:var(--a-color);background:var(--a-bg)}
 
-.app { display:flex; flex-direction:column; height:100vh; height:100dvh; max-width:600px; margin:0 auto; }
+.chat{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
+.chat::-webkit-scrollbar{width:4px}
+.chat::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.chat-hint{text-align:center;color:var(--text-dim);font-size:13px;padding:40px 20px;line-height:2}
 
-.top-bar { display:flex; align-items:center; padding:10px 14px; background:var(--surface);
-  border-bottom:1px solid var(--border); gap:10px; flex-shrink:0; }
-.lang-tabs { display:flex; gap:6px; flex:1; flex-wrap:wrap; }
-.lang-tab { background:transparent; border:1px solid var(--border); border-radius:20px;
-  padding:4px 12px; font-size:12px; cursor:pointer; color:var(--text-mid); transition:all .2s; white-space:nowrap; }
-.lang-tab.active { border-color:var(--a-color); color:var(--a-color); background:var(--a-bg); }
+.msg{display:flex;flex-direction:column;max-width:88%;animation:pop-in .18s ease}
+@keyframes pop-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
+.msg.a{align-self:flex-start}
+.msg.b{align-self:flex-end;align-items:flex-end}
+.msg-who{font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;margin-bottom:3px;padding:0 4px}
+.msg.a .msg-who{color:var(--a-color)}
+.msg.b .msg-who{color:var(--b-color)}
+.msg-bubble{border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:5px}
+.msg.a .msg-bubble{background:rgba(77,182,255,0.13);border-top-left-radius:4px}
+.msg.b .msg-bubble{background:rgba(255,112,67,0.13);border-top-right-radius:4px;text-align:right}
+.msg-orig{font-size:15px;line-height:1.55;color:#fff;font-weight:500}
+.msg-div{height:1px;background:rgba(255,255,255,.08);margin:1px 0}
+.msg-tl{font-size:13px;line-height:1.5;color:rgba(255,255,255,.55);font-style:italic}
+.msg-tling{font-size:12px;color:rgba(255,255,255,.3);display:flex;align-items:center;gap:5px}
+.msg.b .msg-tling{flex-direction:row-reverse}
+.dots{display:inline-flex;gap:3px}
+.dots span{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.3);animation:db 1s infinite;display:inline-block}
+.dots span:nth-child(2){animation-delay:.15s}
+.dots span:nth-child(3){animation-delay:.3s}
+@keyframes db{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
 
-.chat { flex:1; overflow-y:auto; padding:14px 12px; display:flex; flex-direction:column;
-  gap:10px; scroll-behavior:smooth; }
-.chat::-webkit-scrollbar { width:4px; }
-.chat::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+.live-bubble{max-width:88%;padding:8px 14px;border-radius:14px;border:1px dashed var(--border);font-size:14px;color:rgba(255,255,255,.4);font-style:italic;display:flex;align-items:center;gap:8px;animation:pop-in .15s ease}
+.live-bubble.b{align-self:flex-end;flex-direction:row-reverse;text-align:right}
+.micwave{display:flex;gap:2px;align-items:center;flex-shrink:0}
+.micwave span{width:2px;border-radius:1px;animation:mw .65s ease-in-out infinite}
+.live-bubble.a .micwave span{background:var(--a-color)}
+.live-bubble.b .micwave span{background:var(--b-color)}
+.micwave span:nth-child(1){height:5px}
+.micwave span:nth-child(2){height:12px;animation-delay:.1s}
+.micwave span:nth-child(3){height:7px;animation-delay:.2s}
+@keyframes mw{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
 
-.chat-hint { text-align:center; color:var(--text-dim); font-size:13px; padding:40px 20px; line-height:2; }
+/* TTS 播放中指示 */
+.msg-tl.speaking{position:relative}
+.msg.a .msg-tl.speaking{padding-left:12px}
+.msg.b .msg-tl.speaking{padding-right:12px}
+.msg-tl.speaking::before{content:'';position:absolute;top:50%;width:6px;height:6px;border-radius:50%;transform:translateY(-50%);animation:tts-dot .9s ease-in-out infinite}
+.msg.a .msg-tl.speaking::before{left:0;background:var(--a-color)}
+.msg.b .msg-tl.speaking::before{right:0;background:var(--b-color)}
+@keyframes tts-dot{0%,100%{opacity:.3;transform:translateY(-50%) scale(.7)}50%{opacity:1;transform:translateY(-50%) scale(1)}}
 
-.msg { display:flex; flex-direction:column; max-width:88%; animation:pop-in .18s ease; }
-@keyframes pop-in { from{opacity:0;transform:translateY(6px) scale(.97)} to{opacity:1;transform:none} }
-.msg.a { align-self:flex-start; }
-.msg.b { align-self:flex-end; align-items:flex-end; }
+.sub-bar{background:#000;border-top:1px solid var(--border);padding:10px 18px;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;flex-shrink:0}
+.sub-orig{font-size:16px;font-weight:500;color:#fff;line-height:1.45;min-height:1.45em}
+.sub-tl{font-size:14px;line-height:1.45;min-height:1.45em;transition:color .3s}
+.sub-dim{color:var(--text-dim);font-size:13px;font-style:italic}
 
-.msg-who { font-size:10px; font-weight:500; letter-spacing:.07em; text-transform:uppercase;
-  margin-bottom:3px; padding:0 4px; }
-.msg.a .msg-who { color:var(--a-color); }
-.msg.b .msg-who { color:var(--b-color); }
+.bottom-bar{background:var(--surface);border-top:1px solid var(--border);padding:18px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0}
+.status-label{font-size:13px;color:var(--text-mid);letter-spacing:.03em;height:18px;transition:color .3s}
+.big-btn{width:76px;height:76px;border-radius:50%;border:2px solid #3a3;cursor:pointer;display:flex;align-items:center;justify-content:center;background:#1c2a1c;transition:all .2s;outline:none}
+.big-btn:active{transform:scale(.95)}
+.big-btn.live{background:rgba(255,80,80,.12);border-color:#f55;animation:pulse-live 1.8s ease-in-out infinite}
+@keyframes pulse-live{0%,100%{box-shadow:0 0 0 0 rgba(255,80,80,.4)}50%{box-shadow:0 0 0 14px rgba(255,80,80,0)}}
+.big-btn svg{width:32px;height:32px}
+.bottom-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.small-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 14px;font-size:12px;color:var(--text-dim);cursor:pointer;transition:all .2s}
+.small-btn:hover{border-color:#555;color:var(--text-mid)}
+.small-btn.active-btn{border-color:var(--a-color);color:var(--a-color)}
+.small-btn.muted{border-color:#f55;color:#f55}
 
-.msg-bubble { border-radius:14px; padding:10px 14px; display:flex; flex-direction:column; gap:5px; }
-.msg.a .msg-bubble { background:rgba(77,182,255,0.13); border-top-left-radius:4px; }
-.msg.b .msg-bubble { background:rgba(255,112,67,0.13); border-top-right-radius:4px; text-align:right; }
-
-.msg-orig { font-size:15px; line-height:1.55; color:#fff; font-weight:500; }
-.msg-div  { height:1px; background:rgba(255,255,255,.08); margin:1px 0; }
-.msg-tl   { font-size:13px; line-height:1.5; color:rgba(255,255,255,.55); font-style:italic; }
-
-.msg-tling { font-size:12px; color:rgba(255,255,255,.3); display:flex; align-items:center; gap:5px; }
-.msg.b .msg-tling { flex-direction:row-reverse; }
-
-.dots { display:inline-flex; gap:3px; }
-.dots span { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,.3);
-  animation:db 1s infinite; display:inline-block; }
-.dots span:nth-child(2){ animation-delay:.15s; }
-.dots span:nth-child(3){ animation-delay:.3s; }
-@keyframes db { 0%,80%,100%{opacity:.3;transform:scale(.8)} 40%{opacity:1;transform:scale(1)} }
-
-.live-bubble { max-width:88%; padding:8px 14px; border-radius:14px; border:1px dashed var(--border);
-  font-size:14px; color:rgba(255,255,255,.4); font-style:italic; display:flex; align-items:center;
-  gap:8px; animation:pop-in .15s ease; }
-.live-bubble.b { align-self:flex-end; flex-direction:row-reverse; text-align:right; }
-
-.micwave { display:flex; gap:2px; align-items:center; flex-shrink:0; }
-.micwave span { width:2px; border-radius:1px; animation:mw .65s ease-in-out infinite; }
-.live-bubble.a .micwave span { background:var(--a-color); }
-.live-bubble.b .micwave span { background:var(--b-color); }
-.micwave span:nth-child(1){ height:5px; }
-.micwave span:nth-child(2){ height:12px; animation-delay:.1s; }
-.micwave span:nth-child(3){ height:7px; animation-delay:.2s; }
-@keyframes mw { 0%,100%{transform:scaleY(.4)} 50%{transform:scaleY(1)} }
-
-/* TTS 播放指示點 */
-.msg-tl.speaking { position:relative; }
-.msg.a .msg-tl.speaking { padding-left:12px; }
-.msg.b .msg-tl.speaking { padding-right:12px; }
-.msg-tl.speaking::before {
-  content:''; position:absolute; top:50%; width:6px; height:6px; border-radius:50%;
-  transform:translateY(-50%); animation:tts-dot .9s ease-in-out infinite;
-}
-.msg.a .msg-tl.speaking::before { left:0; background:var(--a-color); }
-.msg.b .msg-tl.speaking::before { right:0; background:var(--b-color); }
-@keyframes tts-dot { 0%,100%{opacity:.3;transform:translateY(-50%) scale(.7)} 50%{opacity:1;transform:translateY(-50%) scale(1)} }
-
-.sub-bar { background:#000; border-top:1px solid var(--border); padding:10px 18px; min-height:70px;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:4px; text-align:center; flex-shrink:0; }
-.sub-orig { font-size:16px; font-weight:500; color:#fff; line-height:1.45; min-height:1.45em; }
-.sub-tl   { font-size:14px; line-height:1.45; min-height:1.45em; transition:color .3s; }
-.sub-dim  { color:var(--text-dim); font-size:13px; font-style:italic; }
-
-.bottom-bar { background:var(--surface); border-top:1px solid var(--border);
-  padding:18px 20px 26px; display:flex; flex-direction:column; align-items:center; gap:12px; flex-shrink:0; }
-
-.status-label { font-size:13px; color:var(--text-mid); letter-spacing:.03em; height:18px; transition:color .3s; }
-
-.big-btn { width:76px; height:76px; border-radius:50%; border:2px solid #3a3; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; background:#1c2a1c; transition:all .2s; outline:none; }
-.big-btn:active { transform:scale(.95); }
-.big-btn.live { background:rgba(255,80,80,.12); border-color:#f55; animation:pulse-live 1.8s ease-in-out infinite; }
-@keyframes pulse-live { 0%,100%{box-shadow:0 0 0 0 rgba(255,80,80,.4)} 50%{box-shadow:0 0 0 14px rgba(255,80,80,0)} }
-.big-btn svg { width:32px; height:32px; }
-
-.bottom-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-.small-btn { background:none; border:1px solid var(--border); border-radius:8px; padding:5px 14px;
-  font-size:12px; color:var(--text-dim); cursor:pointer; transition:all .2s; }
-.small-btn:hover { border-color:#555; color:var(--text-mid); }
-.small-btn.muted { border-color:#f55; color:#f55; }
-
-.warn-bar { background:rgba(255,80,80,.1); border:1px solid rgba(255,80,80,.25); border-radius:8px;
-  padding:8px 14px; font-size:12px; color:#ff9090; text-align:center; display:none; margin:0 12px; flex-shrink:0; }
-
-.speaker-pill { display:flex; align-items:center; gap:8px; font-size:12px; height:20px; }
-.pill { padding:2px 10px; border-radius:12px; font-size:11px; font-weight:500;
-  letter-spacing:.04em; opacity:0; transition:opacity .3s; }
-.pill.a { background:var(--a-bg); color:var(--a-color); border:1px solid var(--a-color); }
-.pill.b { background:var(--b-bg); color:var(--b-color); border:1px solid var(--b-color); }
-.pill.show { opacity:1; }
+.warn-bar{background:rgba(255,80,80,.1);border:1px solid rgba(255,80,80,.25);border-radius:8px;padding:8px 14px;font-size:12px;color:#ff9090;text-align:center;display:none;margin:0 12px;flex-shrink:0}
+.speaker-pill{display:flex;align-items:center;gap:8px;font-size:12px;height:20px}
+.pill{padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;letter-spacing:.04em;opacity:0;transition:opacity .3s}
+.pill.a{background:var(--a-bg);color:var(--a-color);border:1px solid var(--a-color)}
+.pill.b{background:var(--b-bg);color:var(--b-color);border:1px solid var(--b-color)}
+.pill.show{opacity:1}
 </style>
 </head>
 <body>
@@ -144,7 +107,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   <div class="chat" id="chat">
     <div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>
   </div>
-
   <div class="warn-bar" id="warnBar"></div>
 
   <div class="sub-bar">
@@ -178,186 +140,221 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
 const LANGS = {
-  vi: { label:'越南語', srCode:'vi-VN', ttsLang:'vi-VN',
-        toTarget:'將以下繁體中文翻譯成越南語，只輸出翻譯結果，不加任何說明。',
-        toZh:    '將以下越南語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  th: { label:'泰語',   srCode:'th-TH', ttsLang:'th-TH',
-        toTarget:'將以下繁體中文翻譯成泰語，只輸出翻譯結果，不加任何說明。',
-        toZh:    '將以下泰語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  id: { label:'印尼語', srCode:'id-ID', ttsLang:'id-ID',
-        toTarget:'將以下繁體中文翻譯成印尼語（Bahasa Indonesia），只輸出翻譯結果，不加任何說明。',
-        toZh:    '將以下印尼語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  en: { label:'英語',   srCode:'en-US', ttsLang:'en-US',
-        toTarget:'將以下繁體中文翻譯成英語，只輸出翻譯結果，不加任何說明。',
-        toZh:    '將以下英語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
+  vi:{ label:'越南語', srCode:'vi-VN', ttsLang:'vi-VN',
+       toTarget:'將以下繁體中文翻譯成越南語，只輸出翻譯結果，不加任何說明。',
+       toZh:    '將以下越南語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
+  th:{ label:'泰語',   srCode:'th-TH', ttsLang:'th-TH',
+       toTarget:'將以下繁體中文翻譯成泰語，只輸出翻譯結果，不加任何說明。',
+       toZh:    '將以下泰語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
+  id:{ label:'印尼語', srCode:'id-ID', ttsLang:'id-ID',
+       toTarget:'將以下繁體中文翻譯成印尼語（Bahasa Indonesia），只輸出翻譯結果，不加任何說明。',
+       toZh:    '將以下印尼語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
+  en:{ label:'英語',   srCode:'en-US', ttsLang:'en-US',
+       toTarget:'將以下繁體中文翻譯成英語，只輸出翻譯結果，不加任何說明。',
+       toZh:    '將以下英語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
 };
 
-// ── 語言偵測（每句獨立）───────────────────────────────────────────────────────
+// ── 語言偵測（每句獨立，不依賴前一句）────────────────────────────────────────
 function detectLang(text) {
-  let zh = 0, latin = 0, thai = 0;
-  for (const ch of text) {
-    const cp = ch.codePointAt(0);
-    if (cp >= 0x4E00 && cp <= 0x9FFF) zh++;
-    if (cp >= 0x0E00 && cp <= 0x0E7F) thai++;
-    if ((cp >= 0x0041 && cp <= 0x007A) || (cp >= 0x00C0 && cp <= 0x024F)) latin++;
+  let zh=0, latin=0, thai=0;
+  for(const ch of text){
+    const cp=ch.codePointAt(0);
+    if(cp>=0x4E00&&cp<=0x9FFF) zh++;
+    if(cp>=0x0E00&&cp<=0x0E7F) thai++;
+    if((cp>=0x0041&&cp<=0x007A)||(cp>=0x00C0&&cp<=0x024F)) latin++;
   }
-  const total = zh + latin + thai + 1;
-  if (zh    / total > 0.30) return 'zh';
-  if (thai  / total > 0.15 && currentLang === 'th')  return 'target';
-  if (latin / total > 0.30 && (currentLang === 'vi' || currentLang === 'en' || currentLang === 'id')) return 'target';
-  return null; // 字太短，無法確定
+  const total=zh+latin+thai+1;
+  if(zh/total>0.30) return 'zh';
+  if(thai/total>0.15&&currentLang==='th') return 'target';
+  if(latin/total>0.30&&(currentLang==='vi'||currentLang==='en'||currentLang==='id')) return 'target';
+  return null;
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let currentLang = 'vi';
-let isLive      = false;
-let isMuted     = false;
-let rec         = null;
-let recMode     = 'zh';   // 交替辨識語言
-let liveElA     = null;
-let liveElB     = null;
-let subTimer    = null;
+let currentLang='vi', isLive=false, isMuted=false;
+let recZh=null, recTgt=null;         // 兩個獨立的 SR 實例
+let processing=false;                 // 防止同時處理兩個結果
+let liveElA=null, liveElB=null, subTimer=null;
+let ttsQueue=[], ttsBusy=false;
+let ttsUnlocked=false;               // TTS user-gesture unlock flag
 
-// TTS 狀態
-let ttsQueue    = [];
-let ttsBusy     = false;
+const SRClass = window.SpeechRecognition||window.webkitSpeechRecognition;
+const hasSR   = !!SRClass;
+const hasTTS  = 'speechSynthesis' in window;
 
-const SR     = window.SpeechRecognition || window.webkitSpeechRecognition;
-const hasSR  = !!SR;
-const hasTTS = ('speechSynthesis' in window);
-
-if (!hasSR)  showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
-if (!hasTTS) document.getElementById('muteBtn').style.display = 'none';
+if(!hasSR) showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
+if(!hasTTS) document.getElementById('muteBtn').style.display='none';
 
 // 預載語音清單
-if (hasTTS) {
+if(hasTTS){
   speechSynthesis.getVoices();
-  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+  speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
+}
+
+// ── TTS unlock：在第一次使用者點擊時播放 0ms 靜音來解鎖 ────────────────────
+// 這是 Chrome/Safari 的 user-gesture 限制必備的 workaround
+function unlockTTS(){
+  if(ttsUnlocked||!hasTTS) return;
+  ttsUnlocked=true;
+  const u=new SpeechSynthesisUtterance('');
+  u.volume=0; u.rate=10;
+  speechSynthesis.speak(u);
 }
 
 // ── Language ──────────────────────────────────────────────────────────────────
-function setLang(el) {
-  if (isLive) return;
-  document.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
+function setLang(el){
+  if(isLive) return;
+  document.querySelectorAll('.lang-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  currentLang = el.dataset.lang;
-  document.getElementById('pillB').textContent = `說話者 B ${LANGS[currentLang].label}`;
+  currentLang=el.dataset.lang;
+  document.getElementById('pillB').textContent=`說話者 B ${LANGS[currentLang].label}`;
 }
 
-function toggleMute() {
-  isMuted = !isMuted;
-  const btn = document.getElementById('muteBtn');
-  btn.textContent = isMuted ? '🔇 翻譯已靜音' : '🔊 翻譯朗讀';
-  btn.classList.toggle('muted', isMuted);
-  if (isMuted) { speechSynthesis.cancel(); ttsQueue = []; ttsBusy = false; }
+function toggleMute(){
+  unlockTTS();
+  isMuted=!isMuted;
+  const btn=document.getElementById('muteBtn');
+  btn.textContent=isMuted?'🔇 翻譯已靜音':'🔊 翻譯朗讀';
+  btn.classList.toggle('muted',isMuted);
+  if(isMuted){speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;}
 }
 
 // ── Session ───────────────────────────────────────────────────────────────────
-function toggleSession() {
-  if (!hasSR) return;
-  isLive ? stopSession() : startSession();
+function toggleSession(){
+  unlockTTS();  // ← 每次點擊都 unlock，確保 TTS 可用
+  if(!hasSR) return;
+  isLive?stopSession():startSession();
 }
 
-function startSession() {
-  isLive = true;
-  recMode = 'zh';
+function startSession(){
+  isLive=true; processing=false;
   document.getElementById('bigBtn').classList.add('live');
-  document.getElementById('iconMic').style.display = 'none';
-  document.getElementById('iconStop').style.display = '';
-  setStatus('對話進行中…', '#f55');
-  const hint = document.getElementById('chat').querySelector('.chat-hint');
-  if (hint) hint.remove();
-  startRec();
+  document.getElementById('iconMic').style.display='none';
+  document.getElementById('iconStop').style.display='';
+  setStatus('對話進行中…','#f55');
+  const hint=document.getElementById('chat').querySelector('.chat-hint');
+  if(hint) hint.remove();
+  startBothRec();
 }
 
-function stopSession() {
-  isLive = false;
-  killRec();
+function stopSession(){
+  isLive=false;
+  killRec(recZh); recZh=null;
+  killRec(recTgt); recTgt=null;
   document.getElementById('bigBtn').classList.remove('live');
-  document.getElementById('iconMic').style.display = '';
-  document.getElementById('iconStop').style.display = 'none';
-  setStatus('按下開始對話', '');
+  document.getElementById('iconMic').style.display='';
+  document.getElementById('iconStop').style.display='none';
+  setStatus('按下開始對話','');
   removeLive('a'); removeLive('b');
   hidePills(); fadeSubtitle();
-  speechSynthesis.cancel(); ttsQueue = []; ttsBusy = false;
+  speechSynthesis.cancel(); ttsQueue=[]; ttsBusy=false;
 }
 
-function setStatus(txt, color) {
-  const el = document.getElementById('statusLabel');
-  el.textContent = txt; el.style.color = color;
+function setStatus(txt,color){
+  const el=document.getElementById('statusLabel');
+  el.textContent=txt; el.style.color=color;
 }
 
 // ── Recognition ───────────────────────────────────────────────────────────────
-function killRec() {
-  if (!rec) return;
-  const r = rec; rec = null;
-  r.onresult = r.onerror = r.onend = null;
-  try { r.abort(); } catch(e) {}
+// 策略：同時啟動中文 SR 和目標語言 SR
+// 哪個先拿到 final result 就用那個的語言，立刻 abort 另一個，
+// 處理完後同時重啟兩個。這樣每句話都是真正雙向偵測，不用猜測。
+
+function killRec(r){
+  if(!r) return;
+  r.onresult=r.onerror=r.onend=null;
+  try{r.abort()}catch(e){}
 }
 
-function startRec() {
-  if (!isLive || ttsBusy) return;  // TTS 播放中不啟動辨識
-  killRec();                        // 確保先清掉舊的
+function startBothRec(){
+  if(!isLive) return;
+  // 稍微錯開啟動，降低瀏覽器衝突機率
+  startOneRec('zh');
+  setTimeout(()=>{ if(isLive) startOneRec('target'); }, 200);
+}
 
-  const r = new SR();
-  rec = r;
-  r.lang = recMode === 'zh' ? 'zh-TW' : LANGS[currentLang].srCode;
-  r.continuous = false;
-  r.interimResults = true;
-  r.maxAlternatives = 1;
+function startOneRec(mode){
+  if(!isLive) return;
+  const r=new SRClass();
+  if(mode==='zh') recZh=r; else recTgt=r;
 
-  r.onresult = e => {
-    let interim = '', final = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      e.results[i].isFinal ? (final += t) : (interim += t);
+  r.lang = mode==='zh' ? 'zh-TW' : LANGS[currentLang].srCode;
+  r.continuous=false;
+  r.interimResults=true;
+  r.maxAlternatives=1;
+
+  // 暫存 interim 給 live bubble 用
+  r.onresult=e=>{
+    if(!isLive) return;
+    let interim='', final='';
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      const t=e.results[i][0].transcript;
+      e.results[i].isFinal?(final+=t):(interim+=t);
     }
-    const text = (final || interim).trim();
-    if (!text) return;
+    const text=(final||interim).trim();
+    if(!text) return;
 
-    // 每句獨立偵測語言
-    let detected = detectLang(text);
-    if (detected === null) detected = (recMode === 'zh') ? 'zh' : 'target';
-    const side = detected === 'zh' ? 'a' : 'b';
+    // interim：顯示 live bubble（用偵測語言決定顏色）
+    if(!final){
+      let det=detectLang(text);
+      if(det===null) det=mode==='zh'?'zh':'target';
+      showLive(det==='zh'?'a':'b', text);
+      setSubOrig(text);
+      return;
+    }
 
-    showLive(side, text);
+    // final：若另一個 SR 也剛好有結果，以先到的為準
+    if(processing) return;
+    processing=true;
+
+    // abort 另一個 SR
+    if(mode==='zh'){ killRec(recTgt); recTgt=null; }
+    else           { killRec(recZh);  recZh=null;  }
+
+    // 決定語言
+    let detected=detectLang(text);
+    if(detected===null) detected=mode==='zh'?'zh':'target';
+    const side=detected==='zh'?'a':'b';
+
+    removeLive(side);
+    showPill(side);
     setSubOrig(text);
 
-    if (final) {
-      removeLive(side);
-      showPill(side);
-      const prompt  = detected === 'zh' ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
-      const ttsLang = detected === 'zh' ? LANGS[currentLang].ttsLang  : 'zh-TW';
-      commitMsg(side, final, prompt, ttsLang);
+    const prompt  = detected==='zh' ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
+    const ttsLang = detected==='zh' ? LANGS[currentLang].ttsLang  : 'zh-TW';
+    commitMsg(side, text, prompt, ttsLang);
+  };
+
+  r.onerror=e=>{
+    if(e.error==='not-allowed'){ showWarn('⚠ 麥克風權限被拒絕'); stopSession(); }
+  };
+
+  r.onend=()=>{
+    if(!isLive) return;
+    // 自己結束後重啟自己（除非 processing 中或 TTS 播放中）
+    if(!processing && !ttsBusy){
+      if(mode==='zh') startOneRec('zh');
+      else            startOneRec('target');
     }
   };
 
-  r.onerror = e => {
-    if (e.error === 'not-allowed') { showWarn('⚠ 麥克風權限被拒絕'); stopSession(); }
-    // no-speech / audio-capture 等錯誤 → 讓 onend 處理重啟
-  };
-
-  r.onend = () => {
-    if (rec !== r) return;   // 已被 killRec 取代，忽略
-    rec = null;
-    if (!isLive) return;
-    recMode = recMode === 'zh' ? 'target' : 'zh';
-    if (!ttsBusy) setTimeout(startRec, 80);
-    // 若 ttsBusy，TTS 結束時會呼叫 startRec
-  };
-
-  try { r.start(); } catch(e) {
-    rec = null;
-    if (isLive && !ttsBusy) setTimeout(startRec, 300);
+  try{ r.start(); }catch(e){
+    if(mode==='zh') recZh=null; else recTgt=null;
   }
 }
 
-// ── Commit message ────────────────────────────────────────────────────────────
-function commitMsg(side, text, prompt, ttsLang) {
-  const who = side === 'a' ? '說話者 A（中文）' : `說話者 B（${LANGS[currentLang].label}）`;
-  const el = document.createElement('div');
-  el.className = `msg ${side}`;
-  el.innerHTML = `
+// 翻譯完成 + TTS 結束後重啟兩個 SR
+function resumeAfterTTS(){
+  processing=false;
+  if(isLive) startBothRec();
+}
+
+// ── Commit message + TTS ──────────────────────────────────────────────────────
+function commitMsg(side, text, prompt, ttsLang){
+  const who=side==='a'?'說話者 A（中文）':`說話者 B（${LANGS[currentLang].label}）`;
+  const el=document.createElement('div');
+  el.className=`msg ${side}`;
+  el.innerHTML=`
     <div class="msg-who">${who}</div>
     <div class="msg-bubble">
       <div class="msg-orig">${esc(text)}</div>
@@ -370,160 +367,148 @@ function commitMsg(side, text, prompt, ttsLang) {
   document.getElementById('chat').appendChild(el);
   scrollChat();
   setSubOrig(text);
-  setSubTl('…', side);
+  setSubTl('…',side);
 
-  doTranslate(text, prompt).then(result => {
-    const tling = el.querySelector('.msg-tling');
-    if (!tling) return;
-    const d = document.createElement('div');
-    d.className = 'msg-tl';
-    d.textContent = result;
+  doTranslate(text, prompt).then(result=>{
+    const tling=el.querySelector('.msg-tling');
+    if(!tling) return;
+    const d=document.createElement('div');
+    d.className='msg-tl';
+    d.textContent=result;
     tling.replaceWith(d);
-    setSubTl(result, side);
+    setSubTl(result,side);
     scrollChat();
-    if (!isMuted && hasTTS) enqueueTTS(result, ttsLang, d);
+    if(!isMuted&&hasTTS){
+      enqueueTTS(result, ttsLang, d);
+    } else {
+      resumeAfterTTS();
+    }
   });
 }
 
-// ── TTS ───────────────────────────────────────────────────────────────────────
-function enqueueTTS(text, lang, labelEl) {
-  ttsQueue.push({ text, lang, labelEl });
-  if (!ttsBusy) drainTTS();
+// ── TTS queue ─────────────────────────────────────────────────────────────────
+function enqueueTTS(text, lang, labelEl){
+  ttsQueue.push({text,lang,labelEl});
+  if(!ttsBusy) drainTTS();
 }
 
-function drainTTS() {
-  // 清空佇列後恢復辨識
-  if (ttsQueue.length === 0) {
-    ttsBusy = false;
-    if (isLive) setTimeout(startRec, 200);
+function drainTTS(){
+  if(ttsQueue.length===0){
+    ttsBusy=false;
+    resumeAfterTTS();
     return;
   }
+  ttsBusy=true;
 
-  ttsBusy = true;
-  killRec();  // TTS 期間停止辨識，避免回授
-
-  const { text, lang, labelEl } = ttsQueue.shift();
-
-  // ── Chrome bug workaround：長時間不說話 speechSynthesis 會凍結 ──
+  const {text,lang,labelEl}=ttsQueue.shift();
   speechSynthesis.cancel();
 
-  // 稍等 cancel 生效再 speak（部分瀏覽器需要）
-  setTimeout(() => {
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang   = lang;
-    utt.rate   = 0.95;
-    utt.volume = 1;
+  setTimeout(()=>{
+    const utt=new SpeechSynthesisUtterance(text);
+    utt.lang=lang; utt.rate=0.95; utt.volume=1;
 
-    // 挑選最匹配的語音
-    const voices = speechSynthesis.getVoices();
-    const voice  = voices.find(v => v.lang === lang)
-                || voices.find(v => v.lang.startsWith(lang.split('-')[0]))
-                || voices.find(v => v.default);
-    if (voice) utt.voice = voice;
+    const voices=speechSynthesis.getVoices();
+    const voice=voices.find(v=>v.lang===lang)
+              ||voices.find(v=>v.lang.startsWith(lang.split('-')[0]));
+    if(voice) utt.voice=voice;
 
-    if (labelEl) labelEl.classList.add('speaking');
+    if(labelEl) labelEl.classList.add('speaking');
 
-    const cleanup = () => {
-      if (labelEl) labelEl.classList.remove('speaking');
-      drainTTS();  // 繼續下一句或恢復辨識
+    let guardTimer;
+    const cleanup=()=>{
+      clearTimeout(guardTimer);
+      if(labelEl) labelEl.classList.remove('speaking');
+      drainTTS();
     };
-    utt.onend   = cleanup;
-    utt.onerror = cleanup;
+    utt.onend=cleanup;
+    utt.onerror=cleanup;
+    // 保底：10 秒若 onend 沒觸發就強制繼續
+    guardTimer=setTimeout(()=>{ speechSynthesis.cancel(); cleanup(); }, 10000);
 
     speechSynthesis.speak(utt);
-
-    // 保底：若 TTS 10 秒後還沒結束（瀏覽器 bug），強制繼續
-    const guard = setTimeout(() => {
-      speechSynthesis.cancel();
-      cleanup();
-    }, 10000);
-    utt.onend = () => { clearTimeout(guard); cleanup(); };
-  }, 100);
+  }, 120);
 }
 
 // ── Translate API ─────────────────────────────────────────────────────────────
-async function doTranslate(text, prompt) {
-  try {
-    const res = await fetch('/.netlify/functions/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [
-          { role:'system', content:'你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。' },
-          { role:'user',   content:`${prompt}\n\n${text}` }
+async function doTranslate(text, prompt){
+  try{
+    const res=await fetch('/.netlify/functions/translate',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        messages:[
+          {role:'system',content:'你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。'},
+          {role:'user',  content:`${prompt}\n\n${text}`}
         ]
       })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '翻譯失敗');
-    return data.choices?.[0]?.message?.content?.trim() || '（翻譯失敗）';
-  } catch(err) {
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'翻譯失敗');
+    return data.choices?.[0]?.message?.content?.trim()||'（翻譯失敗）';
+  }catch(err){
     return `（錯誤：${err.message}）`;
   }
 }
 
 // ── Live bubble ───────────────────────────────────────────────────────────────
-function showLive(side, text) {
-  let el = side === 'a' ? liveElA : liveElB;
-  if (!el) {
-    el = document.createElement('div');
-    el.className = `live-bubble ${side}`;
-    el.innerHTML = `<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>`;
+function showLive(side,text){
+  let el=side==='a'?liveElA:liveElB;
+  if(!el){
+    el=document.createElement('div');
+    el.className=`live-bubble ${side}`;
+    el.innerHTML=`<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>`;
     document.getElementById('chat').appendChild(el);
-    if (side === 'a') liveElA = el; else liveElB = el;
+    if(side==='a') liveElA=el; else liveElB=el;
   }
-  el.querySelector('.live-text').textContent = text;
+  el.querySelector('.live-text').textContent=text;
   scrollChat();
 }
-function removeLive(side) {
-  if (side === 'a' && liveElA) { liveElA.remove(); liveElA = null; }
-  if (side === 'b' && liveElB) { liveElB.remove(); liveElB = null; }
+function removeLive(side){
+  if(side==='a'&&liveElA){liveElA.remove();liveElA=null;}
+  if(side==='b'&&liveElB){liveElB.remove();liveElB=null;}
 }
 
 // ── Subtitle ──────────────────────────────────────────────────────────────────
-function setSubOrig(text) {
+function setSubOrig(text){
   clearTimeout(subTimer);
-  document.getElementById('subOrig').textContent = text;
+  document.getElementById('subOrig').textContent=text;
 }
-function setSubTl(text, side) {
-  const el = document.getElementById('subTl');
-  el.textContent = text;
-  el.style.color = side === 'a' ? 'rgba(77,182,255,.9)'
-                 : side === 'b' ? 'rgba(255,112,67,.9)'
-                 : 'rgba(255,255,255,.5)';
+function setSubTl(text,side){
+  const el=document.getElementById('subTl');
+  el.textContent=text;
+  el.style.color=side==='a'?'rgba(77,182,255,.9)':side==='b'?'rgba(255,112,67,.9)':'rgba(255,255,255,.5)';
 }
-function fadeSubtitle() {
-  subTimer = setTimeout(() => {
-    document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
-    document.getElementById('subTl').textContent = '';
-  }, 5000);
+function fadeSubtitle(){
+  subTimer=setTimeout(()=>{
+    document.getElementById('subOrig').innerHTML='<span class="sub-dim">字幕顯示於此</span>';
+    document.getElementById('subTl').textContent='';
+  },5000);
 }
 
 // ── Pills ─────────────────────────────────────────────────────────────────────
-let pillTimer = null;
-function showPill(side) {
+let pillTimer=null;
+function showPill(side){
   clearTimeout(pillTimer);
   document.getElementById('pillA').classList.remove('show');
   document.getElementById('pillB').classList.remove('show');
-  document.getElementById('pill' + side.toUpperCase()).classList.add('show');
-  pillTimer = setTimeout(hidePills, 3000);
+  document.getElementById('pill'+side.toUpperCase()).classList.add('show');
+  pillTimer=setTimeout(hidePills,3000);
 }
-function hidePills() {
+function hidePills(){
   document.getElementById('pillA').classList.remove('show');
   document.getElementById('pillB').classList.remove('show');
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function scrollChat() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
-function clearChat() {
-  document.getElementById('chat').innerHTML =
-    '<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
-  document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
-  document.getElementById('subTl').textContent = '';
-  speechSynthesis.cancel(); ttsQueue = []; ttsBusy = false;
+function scrollChat(){const c=document.getElementById('chat');c.scrollTop=c.scrollHeight;}
+function clearChat(){
+  document.getElementById('chat').innerHTML='<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
+  document.getElementById('subOrig').innerHTML='<span class="sub-dim">字幕顯示於此</span>';
+  document.getElementById('subTl').textContent='';
+  speechSynthesis.cancel(); ttsQueue=[]; ttsBusy=false;
 }
-function showWarn(msg) { const e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showWarn(msg){const e=document.getElementById('warnBar');e.textContent=msg;e.style.display='block';}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
 </body>
 </html>
