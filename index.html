@@ -10,7 +10,6 @@
 :root {
   --bg: #0d0d0d;
   --surface: #181818;
-  --card: #222;
   --border: #2e2e2e;
   --a-color: #4db6ff;
   --a-bg: rgba(77,182,255,0.12);
@@ -19,296 +18,120 @@
   --text: #efefef;
   --text-dim: #555;
   --text-mid: #888;
-  --r: 16px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-
 html, body { height: 100%; background: var(--bg); color: var(--text);
   font-family: 'Noto Sans TC','Noto Sans',sans-serif; overflow: hidden; }
 
-.app { display:flex; flex-direction:column; height:100vh; height:100dvh;
-  max-width:600px; margin:0 auto; }
+.app { display:flex; flex-direction:column; height:100vh; height:100dvh; max-width:600px; margin:0 auto; }
 
-.top-bar {
-  display: flex;
-  align-items: center;
-  padding: 10px 14px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  gap: 10px;
-  flex-shrink: 0;
-}
+.top-bar { display:flex; align-items:center; padding:10px 14px; background:var(--surface);
+  border-bottom:1px solid var(--border); gap:10px; flex-shrink:0; }
+.lang-tabs { display:flex; gap:6px; flex:1; flex-wrap:wrap; }
+.lang-tab { background:transparent; border:1px solid var(--border); border-radius:20px;
+  padding:4px 12px; font-size:12px; cursor:pointer; color:var(--text-mid); transition:all .2s; white-space:nowrap; }
+.lang-tab.active { border-color:var(--a-color); color:var(--a-color); background:var(--a-bg); }
 
-.lang-tabs {
-  display: flex;
-  gap: 6px;
-  flex: 1;
-  flex-wrap: wrap;
-}
+.chat { flex:1; overflow-y:auto; padding:14px 12px; display:flex; flex-direction:column;
+  gap:10px; scroll-behavior:smooth; }
+.chat::-webkit-scrollbar { width:4px; }
+.chat::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
-.lang-tab {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 4px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  color: var(--text-mid);
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.lang-tab.active {
-  border-color: var(--a-color);
-  color: var(--a-color);
-  background: var(--a-bg);
-}
+.chat-hint { text-align:center; color:var(--text-dim); font-size:13px; padding:40px 20px; line-height:2; }
 
-.chat {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  scroll-behavior: smooth;
-}
-.chat::-webkit-scrollbar { width: 4px; }
-.chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.msg { display:flex; flex-direction:column; max-width:88%; animation:pop-in .18s ease; }
+@keyframes pop-in { from{opacity:0;transform:translateY(6px) scale(.97)} to{opacity:1;transform:none} }
+.msg.a { align-self:flex-start; }
+.msg.b { align-self:flex-end; align-items:flex-end; }
 
-.chat-hint {
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 13px;
-  padding: 40px 20px;
-  line-height: 2;
-}
+.msg-who { font-size:10px; font-weight:500; letter-spacing:.07em; text-transform:uppercase;
+  margin-bottom:3px; padding:0 4px; }
+.msg.a .msg-who { color:var(--a-color); }
+.msg.b .msg-who { color:var(--b-color); }
 
-.msg {
-  display: flex;
-  flex-direction: column;
-  max-width: 88%;
-  animation: pop-in 0.18s ease;
-}
-@keyframes pop-in {
-  from { opacity:0; transform:translateY(6px) scale(0.97); }
-  to   { opacity:1; transform:none; }
-}
-.msg.a { align-self: flex-start; }
-.msg.b { align-self: flex-end; align-items: flex-end; }
+.msg-bubble { border-radius:14px; padding:10px 14px; display:flex; flex-direction:column; gap:5px; }
+.msg.a .msg-bubble { background:rgba(77,182,255,0.13); border-top-left-radius:4px; }
+.msg.b .msg-bubble { background:rgba(255,112,67,0.13); border-top-right-radius:4px; text-align:right; }
 
-.msg-who {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  margin-bottom: 3px;
-  padding: 0 4px;
-}
-.msg.a .msg-who { color: var(--a-color); }
-.msg.b .msg-who { color: var(--b-color); }
+.msg-orig { font-size:15px; line-height:1.55; color:#fff; font-weight:500; }
+.msg-div  { height:1px; background:rgba(255,255,255,.08); margin:1px 0; }
+.msg-tl   { font-size:13px; line-height:1.5; color:rgba(255,255,255,.55); font-style:italic; }
 
-.msg-bubble {
-  border-radius: 14px;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.msg.a .msg-bubble { background: rgba(77,182,255,0.13); border-top-left-radius: 4px; }
-.msg.b .msg-bubble { background: rgba(255,112,67,0.13); border-top-right-radius: 4px; text-align: right; }
-
-.msg-orig  { font-size: 15px; line-height: 1.55; color: #fff; font-weight: 500; }
-.msg-div   { height: 1px; background: rgba(255,255,255,0.08); margin: 1px 0; }
-.msg-tl    { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.55); font-style: italic; }
-
-.msg-tling {
-  font-size: 12px;
-  color: rgba(255,255,255,0.3);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.msg.b .msg-tling { flex-direction: row-reverse; }
+.msg-tling { font-size:12px; color:rgba(255,255,255,.3); display:flex; align-items:center; gap:5px; }
+.msg.b .msg-tling { flex-direction:row-reverse; }
 
 .dots { display:inline-flex; gap:3px; }
-.dots span {
-  width:4px; height:4px; border-radius:50%;
-  background: rgba(255,255,255,0.3);
-  animation: db 1s infinite;
-  display:inline-block;
-}
+.dots span { width:4px; height:4px; border-radius:50%; background:rgba(255,255,255,.3);
+  animation:db 1s infinite; display:inline-block; }
 .dots span:nth-child(2){ animation-delay:.15s; }
 .dots span:nth-child(3){ animation-delay:.3s; }
-@keyframes db {
-  0%,80%,100%{ opacity:.3; transform:scale(.8); }
-  40%{ opacity:1; transform:scale(1); }
-}
+@keyframes db { 0%,80%,100%{opacity:.3;transform:scale(.8)} 40%{opacity:1;transform:scale(1)} }
 
-.live-bubble {
-  max-width: 88%;
-  padding: 8px 14px;
-  border-radius: 14px;
-  border: 1px dashed var(--border);
-  font-size: 14px;
-  color: rgba(255,255,255,0.4);
-  font-style: italic;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  animation: pop-in 0.15s ease;
-}
-.live-bubble.b { align-self: flex-end; flex-direction: row-reverse; text-align: right; }
+.live-bubble { max-width:88%; padding:8px 14px; border-radius:14px; border:1px dashed var(--border);
+  font-size:14px; color:rgba(255,255,255,.4); font-style:italic; display:flex; align-items:center;
+  gap:8px; animation:pop-in .15s ease; }
+.live-bubble.b { align-self:flex-end; flex-direction:row-reverse; text-align:right; }
 
 .micwave { display:flex; gap:2px; align-items:center; flex-shrink:0; }
 .micwave span { width:2px; border-radius:1px; animation:mw .65s ease-in-out infinite; }
-.live-bubble.a .micwave span { background: var(--a-color); }
-.live-bubble.b .micwave span { background: var(--b-color); }
-.micwave span:nth-child(1){ height:5px; animation-delay:0s; }
+.live-bubble.a .micwave span { background:var(--a-color); }
+.live-bubble.b .micwave span { background:var(--b-color); }
+.micwave span:nth-child(1){ height:5px; }
 .micwave span:nth-child(2){ height:12px; animation-delay:.1s; }
 .micwave span:nth-child(3){ height:7px; animation-delay:.2s; }
-@keyframes mw {
-  0%,100%{ transform:scaleY(.4); }
-  50%{ transform:scaleY(1); }
-}
+@keyframes mw { 0%,100%{transform:scaleY(.4)} 50%{transform:scaleY(1)} }
 
-/* TTS 播放中指示 */
-.msg-tl.speaking {
-  position: relative;
-  padding-left: 14px;
-}
+/* TTS 播放指示點 */
+.msg-tl.speaking { position:relative; }
+.msg.a .msg-tl.speaking { padding-left:12px; }
+.msg.b .msg-tl.speaking { padding-right:12px; }
 .msg-tl.speaking::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--a-color);
-  animation: tts-dot 1s ease-in-out infinite;
+  content:''; position:absolute; top:50%; width:6px; height:6px; border-radius:50%;
+  transform:translateY(-50%); animation:tts-dot .9s ease-in-out infinite;
 }
-.msg.b .msg-tl.speaking { padding-left: 0; padding-right: 14px; }
-.msg.b .msg-tl.speaking::before { left: auto; right: 0; background: var(--b-color); }
-@keyframes tts-dot {
-  0%,100% { opacity: 0.3; transform: translateY(-50%) scale(0.7); }
-  50%     { opacity: 1;   transform: translateY(-50%) scale(1); }
-}
+.msg.a .msg-tl.speaking::before { left:0; background:var(--a-color); }
+.msg.b .msg-tl.speaking::before { right:0; background:var(--b-color); }
+@keyframes tts-dot { 0%,100%{opacity:.3;transform:translateY(-50%) scale(.7)} 50%{opacity:1;transform:translateY(-50%) scale(1)} }
 
-.sub-bar {
-  background: #000;
-  border-top: 1px solid var(--border);
-  padding: 10px 18px;
-  min-height: 70px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.sub-orig { font-size: 16px; font-weight: 500; color: #fff; line-height: 1.45; min-height: 1.45em; }
-.sub-tl   { font-size: 14px; line-height: 1.45; min-height: 1.45em; transition: color .3s; }
-.sub-dim  { color: var(--text-dim); font-size: 13px; font-style: italic; font-weight: 400; }
+.sub-bar { background:#000; border-top:1px solid var(--border); padding:10px 18px; min-height:70px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; text-align:center; flex-shrink:0; }
+.sub-orig { font-size:16px; font-weight:500; color:#fff; line-height:1.45; min-height:1.45em; }
+.sub-tl   { font-size:14px; line-height:1.45; min-height:1.45em; transition:color .3s; }
+.sub-dim  { color:var(--text-dim); font-size:13px; font-style:italic; }
 
-.bottom-bar {
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding: 18px 20px 26px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
+.bottom-bar { background:var(--surface); border-top:1px solid var(--border);
+  padding:18px 20px 26px; display:flex; flex-direction:column; align-items:center; gap:12px; flex-shrink:0; }
 
-.status-label {
-  font-size: 13px;
-  color: var(--text-mid);
-  letter-spacing: .03em;
-  height: 18px;
-  transition: color .3s;
-}
+.status-label { font-size:13px; color:var(--text-mid); letter-spacing:.03em; height:18px; transition:color .3s; }
 
-.big-btn {
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  border: 2px solid #3a3;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #1c2a1c;
-  transition: all .2s;
-  outline: none;
-}
-.big-btn:active { transform: scale(.95); }
-.big-btn.live {
-  background: rgba(255,80,80,0.12);
-  border-color: #f55;
-  animation: pulse-live 1.8s ease-in-out infinite;
-}
-@keyframes pulse-live {
-  0%,100%{ box-shadow: 0 0 0 0 rgba(255,80,80,.4); }
-  50%{ box-shadow: 0 0 0 14px rgba(255,80,80,0); }
-}
-.big-btn svg { width: 32px; height: 32px; }
+.big-btn { width:76px; height:76px; border-radius:50%; border:2px solid #3a3; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; background:#1c2a1c; transition:all .2s; outline:none; }
+.big-btn:active { transform:scale(.95); }
+.big-btn.live { background:rgba(255,80,80,.12); border-color:#f55; animation:pulse-live 1.8s ease-in-out infinite; }
+@keyframes pulse-live { 0%,100%{box-shadow:0 0 0 0 rgba(255,80,80,.4)} 50%{box-shadow:0 0 0 14px rgba(255,80,80,0)} }
+.big-btn svg { width:32px; height:32px; }
 
-.bottom-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.bottom-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
+.small-btn { background:none; border:1px solid var(--border); border-radius:8px; padding:5px 14px;
+  font-size:12px; color:var(--text-dim); cursor:pointer; transition:all .2s; }
+.small-btn:hover { border-color:#555; color:var(--text-mid); }
+.small-btn.muted { border-color:#f55; color:#f55; }
 
-.small-btn {
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 5px 14px;
-  font-size: 12px;
-  color: var(--text-dim);
-  cursor: pointer;
-  transition: all .2s;
-}
-.small-btn:hover { border-color: #555; color: var(--text-mid); }
-.small-btn.muted { border-color: #f55; color: #f55; }
+.warn-bar { background:rgba(255,80,80,.1); border:1px solid rgba(255,80,80,.25); border-radius:8px;
+  padding:8px 14px; font-size:12px; color:#ff9090; text-align:center; display:none; margin:0 12px; flex-shrink:0; }
 
-.warn-bar {
-  background: rgba(255,80,80,.1);
-  border: 1px solid rgba(255,80,80,.25);
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-size: 12px;
-  color: #ff9090;
-  text-align: center;
-  display: none;
-  margin: 0 12px;
-  flex-shrink: 0;
-}
-
-.speaker-pill {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  height: 20px;
-}
-.pill {
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: .04em;
-  opacity: 0;
-  transition: opacity .3s;
-}
-.pill.a { background: var(--a-bg); color: var(--a-color); border: 1px solid var(--a-color); }
-.pill.b { background: var(--b-bg); color: var(--b-color); border: 1px solid var(--b-color); }
-.pill.show { opacity: 1; }
+.speaker-pill { display:flex; align-items:center; gap:8px; font-size:12px; height:20px; }
+.pill { padding:2px 10px; border-radius:12px; font-size:11px; font-weight:500;
+  letter-spacing:.04em; opacity:0; transition:opacity .3s; }
+.pill.a { background:var(--a-bg); color:var(--a-color); border:1px solid var(--a-color); }
+.pill.b { background:var(--b-bg); color:var(--b-color); border:1px solid var(--b-color); }
+.pill.show { opacity:1; }
 </style>
 </head>
 <body>
 <div class="app">
-
   <div class="top-bar">
     <div class="lang-tabs">
       <button class="lang-tab active" data-lang="vi" onclick="setLang(this)">🇻🇳 越南語</button>
@@ -319,11 +142,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   </div>
 
   <div class="chat" id="chat">
-    <div class="chat-hint">
-      按下開始按鈕<br>
-      說中文 → 自動翻譯成目標語言<br>
-      說目標語言 → 自動翻譯成中文
-    </div>
+    <div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>
   </div>
 
   <div class="warn-bar" id="warnBar"></div>
@@ -338,9 +157,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
       <div class="pill a" id="pillA">說話者 A 中文</div>
       <div class="pill b" id="pillB">說話者 B</div>
     </div>
-
     <div class="status-label" id="statusLabel">按下開始對話</div>
-
     <button class="big-btn" id="bigBtn" onclick="toggleSession()">
       <svg id="iconMic" viewBox="0 0 32 32" fill="none">
         <rect x="11" y="3" width="10" height="16" rx="5" fill="#4a4"/>
@@ -351,7 +168,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
         <rect x="9" y="9" width="14" height="14" rx="3" fill="#f55"/>
       </svg>
     </button>
-
     <div class="bottom-actions">
       <button class="small-btn" id="muteBtn" onclick="toggleMute()">🔊 翻譯朗讀</button>
       <button class="small-btn" onclick="clearChat()">清除記錄</button>
@@ -360,27 +176,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 </div>
 
 <script>
-// ─── Config ───────────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 const LANGS = {
-  vi: { label:'越南語', flag:'🇻🇳',
-        srCode: 'vi-VN', ttsLang: 'vi-VN',
+  vi: { label:'越南語', srCode:'vi-VN', ttsLang:'vi-VN',
         toTarget:'將以下繁體中文翻譯成越南語，只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下越南語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  th: { label:'泰語', flag:'🇹🇭',
-        srCode: 'th-TH', ttsLang: 'th-TH',
+  th: { label:'泰語',   srCode:'th-TH', ttsLang:'th-TH',
         toTarget:'將以下繁體中文翻譯成泰語，只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下泰語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  id: { label:'印尼語', flag:'🇮🇩',
-        srCode: 'id-ID', ttsLang: 'id-ID',
+  id: { label:'印尼語', srCode:'id-ID', ttsLang:'id-ID',
         toTarget:'將以下繁體中文翻譯成印尼語（Bahasa Indonesia），只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下印尼語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  en: { label:'英語', flag:'🇬🇧',
-        srCode: 'en-US', ttsLang: 'en-US',
+  en: { label:'英語',   srCode:'en-US', ttsLang:'en-US',
         toTarget:'將以下繁體中文翻譯成英語，只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下英語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
 };
 
-// ─── 語言偵測（每句話獨立判斷）─────────────────────────────────────────────
+// ── 語言偵測（每句獨立）───────────────────────────────────────────────────────
 function detectLang(text) {
   let zh = 0, latin = 0, thai = 0;
   for (const ch of text) {
@@ -390,39 +202,40 @@ function detectLang(text) {
     if ((cp >= 0x0041 && cp <= 0x007A) || (cp >= 0x00C0 && cp <= 0x024F)) latin++;
   }
   const total = zh + latin + thai + 1;
-  const cur = currentLang;
-
-  if (zh / total > 0.3)  return 'zh';
-  if (thai / total > 0.15 && cur === 'th') return 'target';
-  if (latin / total > 0.3 && (cur === 'vi' || cur === 'en' || cur === 'id')) return 'target';
-  return null; // 無法確定，由呼叫端依辨識模型推斷
+  if (zh    / total > 0.30) return 'zh';
+  if (thai  / total > 0.15 && currentLang === 'th')  return 'target';
+  if (latin / total > 0.30 && (currentLang === 'vi' || currentLang === 'en' || currentLang === 'id')) return 'target';
+  return null; // 字太短，無法確定
 }
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 let currentLang = 'vi';
-let isLive = false;
-let isMuted = false;
-let rec = null;
-let recMode = 'zh';   // 交替的辨識模型語言
-let liveElA = null;
-let liveElB = null;
-let subTimer = null;
-let ttsQueue = [];
-let ttsSpeaking = false;
+let isLive      = false;
+let isMuted     = false;
+let rec         = null;
+let recMode     = 'zh';   // 交替辨識語言
+let liveElA     = null;
+let liveElB     = null;
+let subTimer    = null;
 
-const hasSR  = ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+// TTS 狀態
+let ttsQueue    = [];
+let ttsBusy     = false;
+
+const SR     = window.SpeechRecognition || window.webkitSpeechRecognition;
+const hasSR  = !!SR;
 const hasTTS = ('speechSynthesis' in window);
 
 if (!hasSR)  showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
 if (!hasTTS) document.getElementById('muteBtn').style.display = 'none';
 
-// 預先載入語音清單（部分瀏覽器需要觸發一次）
+// 預載語音清單
 if (hasTTS) {
   speechSynthesis.getVoices();
   speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
 }
 
-// ─── Language select ──────────────────────────────────────────────────────────
+// ── Language ──────────────────────────────────────────────────────────────────
 function setLang(el) {
   if (isLive) return;
   document.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
@@ -436,10 +249,10 @@ function toggleMute() {
   const btn = document.getElementById('muteBtn');
   btn.textContent = isMuted ? '🔇 翻譯已靜音' : '🔊 翻譯朗讀';
   btn.classList.toggle('muted', isMuted);
-  if (isMuted) { speechSynthesis.cancel(); ttsQueue = []; ttsSpeaking = false; }
+  if (isMuted) { speechSynthesis.cancel(); ttsQueue = []; ttsBusy = false; }
 }
 
-// ─── Session ──────────────────────────────────────────────────────────────────
+// ── Session ───────────────────────────────────────────────────────────────────
 function toggleSession() {
   if (!hasSR) return;
   isLive ? stopSession() : startSession();
@@ -451,8 +264,7 @@ function startSession() {
   document.getElementById('bigBtn').classList.add('live');
   document.getElementById('iconMic').style.display = 'none';
   document.getElementById('iconStop').style.display = '';
-  document.getElementById('statusLabel').textContent = '對話進行中…';
-  document.getElementById('statusLabel').style.color = '#f55';
+  setStatus('對話進行中…', '#f55');
   const hint = document.getElementById('chat').querySelector('.chat-hint');
   if (hint) hint.remove();
   startRec();
@@ -460,30 +272,35 @@ function startSession() {
 
 function stopSession() {
   isLive = false;
+  killRec();
   document.getElementById('bigBtn').classList.remove('live');
   document.getElementById('iconMic').style.display = '';
   document.getElementById('iconStop').style.display = 'none';
-  document.getElementById('statusLabel').textContent = '按下開始對話';
-  document.getElementById('statusLabel').style.color = '';
-  killRec();
+  setStatus('按下開始對話', '');
   removeLive('a'); removeLive('b');
   hidePills(); fadeSubtitle();
+  speechSynthesis.cancel(); ttsQueue = []; ttsBusy = false;
 }
 
+function setStatus(txt, color) {
+  const el = document.getElementById('statusLabel');
+  el.textContent = txt; el.style.color = color;
+}
+
+// ── Recognition ───────────────────────────────────────────────────────────────
 function killRec() {
   if (!rec) return;
   const r = rec; rec = null;
+  r.onresult = r.onerror = r.onend = null;
   try { r.abort(); } catch(e) {}
 }
 
-// ─── Recognition：交替語言模型，每句獨立偵測 ─────────────────────────────────
 function startRec() {
-  if (!isLive) return;
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!isLive || ttsBusy) return;  // TTS 播放中不啟動辨識
+  killRec();                        // 確保先清掉舊的
+
   const r = new SR();
   rec = r;
-
-  // 交替：中文模型 / 目標語言模型，確保兩種語言都有機會被辨識
   r.lang = recMode === 'zh' ? 'zh-TW' : LANGS[currentLang].srCode;
   r.continuous = false;
   r.interimResults = true;
@@ -498,12 +315,11 @@ function startRec() {
     const text = (final || interim).trim();
     if (!text) return;
 
-    // 每句話獨立偵測語言
+    // 每句獨立偵測語言
     let detected = detectLang(text);
-    // 偵測不確定（太短/數字），用辨識模型語言推斷
     if (detected === null) detected = (recMode === 'zh') ? 'zh' : 'target';
-
     const side = detected === 'zh' ? 'a' : 'b';
+
     showLive(side, text);
     setSubOrig(text);
 
@@ -511,31 +327,34 @@ function startRec() {
       removeLive(side);
       showPill(side);
       const prompt  = detected === 'zh' ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
-      const ttsLang = detected === 'zh' ? LANGS[currentLang].ttsLang : 'zh-TW';
+      const ttsLang = detected === 'zh' ? LANGS[currentLang].ttsLang  : 'zh-TW';
       commitMsg(side, final, prompt, ttsLang);
     }
   };
 
   r.onerror = e => {
     if (e.error === 'not-allowed') { showWarn('⚠ 麥克風權限被拒絕'); stopSession(); }
-    // no-speech / audio-capture → onend 自動重啟
+    // no-speech / audio-capture 等錯誤 → 讓 onend 處理重啟
   };
 
   r.onend = () => {
+    if (rec !== r) return;   // 已被 killRec 取代，忽略
+    rec = null;
     if (!isLive) return;
     recMode = recMode === 'zh' ? 'target' : 'zh';
-    // TTS 播放中時不啟動辨識（避免自己的聲音被收進去）
-    if (!ttsSpeaking) setTimeout(startRec, 80);
+    if (!ttsBusy) setTimeout(startRec, 80);
+    // 若 ttsBusy，TTS 結束時會呼叫 startRec
   };
 
-  try { r.start(); } catch(e) {}
+  try { r.start(); } catch(e) {
+    rec = null;
+    if (isLive && !ttsBusy) setTimeout(startRec, 300);
+  }
 }
 
-// ─── Commit message ───────────────────────────────────────────────────────────
+// ── Commit message ────────────────────────────────────────────────────────────
 function commitMsg(side, text, prompt, ttsLang) {
-  const cfg = LANGS[currentLang];
-  const who = side === 'a' ? '說話者 A（中文）' : `說話者 B（${cfg.label}）`;
-
+  const who = side === 'a' ? '說話者 A（中文）' : `說話者 B（${LANGS[currentLang].label}）`;
   const el = document.createElement('div');
   el.className = `msg ${side}`;
   el.innerHTML = `
@@ -555,61 +374,74 @@ function commitMsg(side, text, prompt, ttsLang) {
 
   doTranslate(text, prompt).then(result => {
     const tling = el.querySelector('.msg-tling');
-    if (tling) {
-      const d = document.createElement('div');
-      d.className = 'msg-tl';
-      d.textContent = result;
-      tling.replaceWith(d);
-      if (!isMuted && hasTTS) enqueueTTS(result, ttsLang, d);
-    }
+    if (!tling) return;
+    const d = document.createElement('div');
+    d.className = 'msg-tl';
+    d.textContent = result;
+    tling.replaceWith(d);
     setSubTl(result, side);
     scrollChat();
+    if (!isMuted && hasTTS) enqueueTTS(result, ttsLang, d);
   });
 }
 
-// ─── TTS Queue ────────────────────────────────────────────────────────────────
+// ── TTS ───────────────────────────────────────────────────────────────────────
 function enqueueTTS(text, lang, labelEl) {
   ttsQueue.push({ text, lang, labelEl });
-  if (!ttsSpeaking) drainTTS();
+  if (!ttsBusy) drainTTS();
 }
 
 function drainTTS() {
+  // 清空佇列後恢復辨識
   if (ttsQueue.length === 0) {
-    ttsSpeaking = false;
-    // TTS 結束，恢復辨識
-    if (isLive && !rec) setTimeout(startRec, 150);
+    ttsBusy = false;
+    if (isLive) setTimeout(startRec, 200);
     return;
   }
-  ttsSpeaking = true;
 
-  // 暫停辨識，避免 TTS 聲音被麥克風收進去
-  killRec();
+  ttsBusy = true;
+  killRec();  // TTS 期間停止辨識，避免回授
 
   const { text, lang, labelEl } = ttsQueue.shift();
-  const utt = new SpeechSynthesisUtterance(text);
-  utt.lang = lang;
-  utt.rate = 0.95;
-  utt.volume = 1;
 
-  // 選取最接近的語音
-  const voices = speechSynthesis.getVoices();
-  const voice = voices.find(v => v.lang === lang)
-             || voices.find(v => v.lang.startsWith(lang.split('-')[0]));
-  if (voice) utt.voice = voice;
+  // ── Chrome bug workaround：長時間不說話 speechSynthesis 會凍結 ──
+  speechSynthesis.cancel();
 
-  if (labelEl) labelEl.classList.add('speaking');
+  // 稍等 cancel 生效再 speak（部分瀏覽器需要）
+  setTimeout(() => {
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang   = lang;
+    utt.rate   = 0.95;
+    utt.volume = 1;
 
-  const done = () => {
-    if (labelEl) labelEl.classList.remove('speaking');
-    setTimeout(drainTTS, 150);
-  };
-  utt.onend = done;
-  utt.onerror = done;
+    // 挑選最匹配的語音
+    const voices = speechSynthesis.getVoices();
+    const voice  = voices.find(v => v.lang === lang)
+                || voices.find(v => v.lang.startsWith(lang.split('-')[0]))
+                || voices.find(v => v.default);
+    if (voice) utt.voice = voice;
 
-  speechSynthesis.speak(utt);
+    if (labelEl) labelEl.classList.add('speaking');
+
+    const cleanup = () => {
+      if (labelEl) labelEl.classList.remove('speaking');
+      drainTTS();  // 繼續下一句或恢復辨識
+    };
+    utt.onend   = cleanup;
+    utt.onerror = cleanup;
+
+    speechSynthesis.speak(utt);
+
+    // 保底：若 TTS 10 秒後還沒結束（瀏覽器 bug），強制繼續
+    const guard = setTimeout(() => {
+      speechSynthesis.cancel();
+      cleanup();
+    }, 10000);
+    utt.onend = () => { clearTimeout(guard); cleanup(); };
+  }, 100);
 }
 
-// ─── Translate API ────────────────────────────────────────────────────────────
+// ── Translate API ─────────────────────────────────────────────────────────────
 async function doTranslate(text, prompt) {
   try {
     const res = await fetch('/.netlify/functions/translate', {
@@ -617,8 +449,8 @@ async function doTranslate(text, prompt) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages: [
-          { role: 'system', content: '你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。' },
-          { role: 'user',   content: `${prompt}\n\n${text}` }
+          { role:'system', content:'你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。' },
+          { role:'user',   content:`${prompt}\n\n${text}` }
         ]
       })
     });
@@ -630,7 +462,7 @@ async function doTranslate(text, prompt) {
   }
 }
 
-// ─── Live bubble ──────────────────────────────────────────────────────────────
+// ── Live bubble ───────────────────────────────────────────────────────────────
 function showLive(side, text) {
   let el = side === 'a' ? liveElA : liveElB;
   if (!el) {
@@ -639,7 +471,6 @@ function showLive(side, text) {
     el.innerHTML = `<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>`;
     document.getElementById('chat').appendChild(el);
     if (side === 'a') liveElA = el; else liveElB = el;
-    scrollChat();
   }
   el.querySelector('.live-text').textContent = text;
   scrollChat();
@@ -649,7 +480,7 @@ function removeLive(side) {
   if (side === 'b' && liveElB) { liveElB.remove(); liveElB = null; }
 }
 
-// ─── Subtitle ─────────────────────────────────────────────────────────────────
+// ── Subtitle ──────────────────────────────────────────────────────────────────
 function setSubOrig(text) {
   clearTimeout(subTimer);
   document.getElementById('subOrig').textContent = text;
@@ -668,7 +499,7 @@ function fadeSubtitle() {
   }, 5000);
 }
 
-// ─── Pills ────────────────────────────────────────────────────────────────────
+// ── Pills ─────────────────────────────────────────────────────────────────────
 let pillTimer = null;
 function showPill(side) {
   clearTimeout(pillTimer);
@@ -682,22 +513,17 @@ function hidePills() {
   document.getElementById('pillB').classList.remove('show');
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function scrollChat() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
 function clearChat() {
   document.getElementById('chat').innerHTML =
     '<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
   document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
   document.getElementById('subTl').textContent = '';
-  speechSynthesis.cancel(); ttsQueue = []; ttsSpeaking = false;
+  speechSynthesis.cancel(); ttsQueue = []; ttsBusy = false;
 }
-function showWarn(msg) {
-  const e = document.getElementById('warnBar');
-  e.textContent = msg; e.style.display = 'block';
-}
-function esc(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function showWarn(msg) { const e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
 </html>
