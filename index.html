@@ -30,7 +30,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .app { display:flex; flex-direction:column; height:100vh; height:100dvh;
   max-width:600px; margin:0 auto; }
 
-/* ── TOP BAR ── */
 .top-bar {
   display: flex;
   align-items: center;
@@ -65,7 +64,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   background: var(--a-bg);
 }
 
-/* ── CHAT AREA ── */
 .chat {
   flex: 1;
   overflow-y: auto;
@@ -86,7 +84,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   line-height: 2;
 }
 
-/* ── MESSAGE ── */
 .msg {
   display: flex;
   flex-direction: column;
@@ -97,7 +94,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   from { opacity:0; transform:translateY(6px) scale(0.97); }
   to   { opacity:1; transform:none; }
 }
-
 .msg.a { align-self: flex-start; }
 .msg.b { align-self: flex-end; align-items: flex-end; }
 
@@ -149,7 +145,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   40%{ opacity:1; transform:scale(1); }
 }
 
-/* ── LIVE PREVIEW BUBBLE ── */
 .live-bubble {
   max-width: 88%;
   padding: 8px 14px;
@@ -177,7 +172,30 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   50%{ transform:scaleY(1); }
 }
 
-/* ── SUBTITLE BAR ── */
+/* TTS 播放中指示 */
+.msg-tl.speaking {
+  position: relative;
+  padding-left: 14px;
+}
+.msg-tl.speaking::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--a-color);
+  animation: tts-dot 1s ease-in-out infinite;
+}
+.msg.b .msg-tl.speaking { padding-left: 0; padding-right: 14px; }
+.msg.b .msg-tl.speaking::before { left: auto; right: 0; background: var(--b-color); }
+@keyframes tts-dot {
+  0%,100% { opacity: 0.3; transform: translateY(-50%) scale(0.7); }
+  50%     { opacity: 1;   transform: translateY(-50%) scale(1); }
+}
+
 .sub-bar {
   background: #000;
   border-top: 1px solid var(--border);
@@ -195,7 +213,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 .sub-tl   { font-size: 14px; line-height: 1.45; min-height: 1.45em; transition: color .3s; }
 .sub-dim  { color: var(--text-dim); font-size: 13px; font-style: italic; font-weight: 400; }
 
-/* ── BOTTOM BAR ── */
 .bottom-bar {
   background: var(--surface);
   border-top: 1px solid var(--border);
@@ -207,7 +224,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   flex-shrink: 0;
 }
 
-/* ── STATUS LABEL ── */
 .status-label {
   font-size: 13px;
   color: var(--text-mid);
@@ -216,24 +232,20 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   transition: color .3s;
 }
 
-/* ── BIG BUTTON ── */
 .big-btn {
   width: 76px;
   height: 76px;
   border-radius: 50%;
-  border: none;
+  border: 2px solid #3a3;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   background: #1c2a1c;
-  border: 2px solid #3a3;
   transition: all .2s;
   outline: none;
-  position: relative;
 }
 .big-btn:active { transform: scale(.95); }
-
 .big-btn.live {
   background: rgba(255,80,80,0.12);
   border-color: #f55;
@@ -243,28 +255,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   0%,100%{ box-shadow: 0 0 0 0 rgba(255,80,80,.4); }
   50%{ box-shadow: 0 0 0 14px rgba(255,80,80,0); }
 }
-
 .big-btn svg { width: 32px; height: 32px; }
 
-/* ── BOTTOM ROW ── */
-.bottom-actions {
-  display: flex;
-  gap: 16px;
-}
+.bottom-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 
 .small-btn {
   background: none;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 5px 16px;
+  padding: 5px 14px;
   font-size: 12px;
   color: var(--text-dim);
   cursor: pointer;
   transition: all .2s;
 }
 .small-btn:hover { border-color: #555; color: var(--text-mid); }
+.small-btn.muted { border-color: #f55; color: #f55; }
 
-/* ── WARN ── */
 .warn-bar {
   background: rgba(255,80,80,.1);
   border: 1px solid rgba(255,80,80,.25);
@@ -278,7 +285,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
   flex-shrink: 0;
 }
 
-/* ── SPEAKER INDICATOR ── */
 .speaker-pill {
   display: flex;
   align-items: center;
@@ -303,7 +309,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
 <body>
 <div class="app">
 
-  <!-- 頂部語言選擇 -->
   <div class="top-bar">
     <div class="lang-tabs">
       <button class="lang-tab active" data-lang="vi" onclick="setLang(this)">🇻🇳 越南語</button>
@@ -313,7 +318,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
     </div>
   </div>
 
-  <!-- 對話記錄 -->
   <div class="chat" id="chat">
     <div class="chat-hint">
       按下開始按鈕<br>
@@ -322,18 +326,14 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
     </div>
   </div>
 
-  <!-- 警告列 -->
   <div class="warn-bar" id="warnBar"></div>
 
-  <!-- 即時字幕 -->
   <div class="sub-bar">
     <div class="sub-orig" id="subOrig"><span class="sub-dim">字幕顯示於此</span></div>
-    <div class="sub-tl"   id="subTl"></div>
+    <div class="sub-tl" id="subTl"></div>
   </div>
 
-  <!-- 底部控制 -->
   <div class="bottom-bar">
-
     <div class="speaker-pill">
       <div class="pill a" id="pillA">說話者 A 中文</div>
       <div class="pill b" id="pillB">說話者 B</div>
@@ -353,30 +353,34 @@ html, body { height: 100%; background: var(--bg); color: var(--text);
     </button>
 
     <div class="bottom-actions">
+      <button class="small-btn" id="muteBtn" onclick="toggleMute()">🔊 翻譯朗讀</button>
       <button class="small-btn" onclick="clearChat()">清除記錄</button>
     </div>
-
   </div>
 </div>
 
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
 const LANGS = {
-  vi: { label:'越南語', flag:'🇻🇳', code:'vi-VN',
+  vi: { label:'越南語', flag:'🇻🇳',
+        srCode: 'vi-VN', ttsLang: 'vi-VN',
         toTarget:'將以下繁體中文翻譯成越南語，只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下越南語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  th: { label:'泰語', flag:'🇹🇭', code:'th-TH',
+  th: { label:'泰語', flag:'🇹🇭',
+        srCode: 'th-TH', ttsLang: 'th-TH',
         toTarget:'將以下繁體中文翻譯成泰語，只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下泰語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  id: { label:'印尼語', flag:'🇮🇩', code:'id-ID',
+  id: { label:'印尼語', flag:'🇮🇩',
+        srCode: 'id-ID', ttsLang: 'id-ID',
         toTarget:'將以下繁體中文翻譯成印尼語（Bahasa Indonesia），只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下印尼語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
-  en: { label:'英語', flag:'🇬🇧', code:'en-US',
+  en: { label:'英語', flag:'🇬🇧',
+        srCode: 'en-US', ttsLang: 'en-US',
         toTarget:'將以下繁體中文翻譯成英語，只輸出翻譯結果，不加任何說明。',
         toZh:    '將以下英語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。' },
 };
 
-// ── 語言偵測：用 Unicode block 判斷 ──────────────────────────────────────────
+// ─── 語言偵測（每句話獨立判斷）─────────────────────────────────────────────
 function detectLang(text) {
   let zh = 0, latin = 0, thai = 0;
   for (const ch of text) {
@@ -387,39 +391,55 @@ function detectLang(text) {
   }
   const total = zh + latin + thai + 1;
   const cur = currentLang;
-  if (zh / total > 0.35) return 'zh';
-  if (thai / total > 0.2 && cur === 'th') return 'target';
+
+  if (zh / total > 0.3)  return 'zh';
+  if (thai / total > 0.15 && cur === 'th') return 'target';
   if (latin / total > 0.3 && (cur === 'vi' || cur === 'en' || cur === 'id')) return 'target';
-  return 'zh';
+  return null; // 無法確定，由呼叫端依辨識模型推斷
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let currentLang = 'vi';
 let isLive = false;
-let rec = null;        // 單一 SpeechRecognition 實例
+let isMuted = false;
+let rec = null;
+let recMode = 'zh';   // 交替的辨識模型語言
 let liveElA = null;
 let liveElB = null;
 let subTimer = null;
+let ttsQueue = [];
+let ttsSpeaking = false;
 
-const hasSR = ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
-if (!hasSR) showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
+const hasSR  = ('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window);
+const hasTTS = ('speechSynthesis' in window);
 
-// ─── Language ─────────────────────────────────────────────────────────────────
+if (!hasSR)  showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
+if (!hasTTS) document.getElementById('muteBtn').style.display = 'none';
+
+// 預先載入語音清單（部分瀏覽器需要觸發一次）
+if (hasTTS) {
+  speechSynthesis.getVoices();
+  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+}
+
+// ─── Language select ──────────────────────────────────────────────────────────
 function setLang(el) {
   if (isLive) return;
   document.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   currentLang = el.dataset.lang;
-  const cfg = LANGS[currentLang];
-  document.getElementById('pillB').textContent = `說話者 B ${cfg.label}`;
-  // 重啟辨識以套用新語言
-  if (isLive) {
-    stopRecognition();
-    startRecognition();
-  }
+  document.getElementById('pillB').textContent = `說話者 B ${LANGS[currentLang].label}`;
 }
 
-// ─── Session toggle ───────────────────────────────────────────────────────────
+function toggleMute() {
+  isMuted = !isMuted;
+  const btn = document.getElementById('muteBtn');
+  btn.textContent = isMuted ? '🔇 翻譯已靜音' : '🔊 翻譯朗讀';
+  btn.classList.toggle('muted', isMuted);
+  if (isMuted) { speechSynthesis.cancel(); ttsQueue = []; ttsSpeaking = false; }
+}
+
+// ─── Session ──────────────────────────────────────────────────────────────────
 function toggleSession() {
   if (!hasSR) return;
   isLive ? stopSession() : startSession();
@@ -427,58 +447,44 @@ function toggleSession() {
 
 function startSession() {
   isLive = true;
-  const btn = document.getElementById('bigBtn');
-  btn.classList.add('live');
+  recMode = 'zh';
+  document.getElementById('bigBtn').classList.add('live');
   document.getElementById('iconMic').style.display = 'none';
   document.getElementById('iconStop').style.display = '';
   document.getElementById('statusLabel').textContent = '對話進行中…';
   document.getElementById('statusLabel').style.color = '#f55';
-
   const hint = document.getElementById('chat').querySelector('.chat-hint');
   if (hint) hint.remove();
-
-  startRecognition();
+  startRec();
 }
 
 function stopSession() {
   isLive = false;
-  const btn = document.getElementById('bigBtn');
-  btn.classList.remove('live');
+  document.getElementById('bigBtn').classList.remove('live');
   document.getElementById('iconMic').style.display = '';
   document.getElementById('iconStop').style.display = 'none';
   document.getElementById('statusLabel').textContent = '按下開始對話';
   document.getElementById('statusLabel').style.color = '';
-
-  stopRecognition();
-  removeLive('a');
-  removeLive('b');
-  hidePills();
-  fadeSubtitle();
+  killRec();
+  removeLive('a'); removeLive('b');
+  hidePills(); fadeSubtitle();
 }
 
-function stopRecognition() {
+function killRec() {
   if (!rec) return;
-  const r = rec;
-  rec = null;
-  try { r.stop(); } catch(e) {}
+  const r = rec; rec = null;
+  try { r.abort(); } catch(e) {}
 }
 
-// ─── 單一 Recognition，用 detectLang 判斷語言方向 ────────────────────────────
-// 策略：先用中文模型辨識。若偵測到是目標語言，立刻重啟成目標語言模型繼續。
-// 兩個模型交替使用，確保辨識率最佳，且同一時間只有一個在運行。
-
-let recLang = 'zh'; // 目前辨識語言：'zh' 或 'target'
-
-function startRecognition() {
+// ─── Recognition：交替語言模型，每句獨立偵測 ─────────────────────────────────
+function startRec() {
   if (!isLive) return;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const r = new SR();
   rec = r;
 
-  // 交替語言：上次是中文就改成目標語言，反之亦然
-  // 但實際上我們依靠 detectLang 結果來判斷翻譯方向
-  // 辨識語言則每次交替，讓兩種語言都能被正確辨識
-  r.lang = recLang === 'zh' ? 'zh-TW' : LANGS[currentLang].code;
+  // 交替：中文模型 / 目標語言模型，確保兩種語言都有機會被辨識
+  r.lang = recMode === 'zh' ? 'zh-TW' : LANGS[currentLang].srCode;
   r.continuous = false;
   r.interimResults = true;
   r.maxAlternatives = 1;
@@ -489,45 +495,142 @@ function startRecognition() {
       const t = e.results[i][0].transcript;
       e.results[i].isFinal ? (final += t) : (interim += t);
     }
-    const text = final || interim;
-    if (!text.trim()) return;
+    const text = (final || interim).trim();
+    if (!text) return;
 
-    // 用 detectLang 判斷語言方向（比辨識模型更準確）
-    const detected = detectLang(text);
+    // 每句話獨立偵測語言
+    let detected = detectLang(text);
+    // 偵測不確定（太短/數字），用辨識模型語言推斷
+    if (detected === null) detected = (recMode === 'zh') ? 'zh' : 'target';
+
     const side = detected === 'zh' ? 'a' : 'b';
-
     showLive(side, text);
     setSubOrig(text);
 
-    if (final.trim()) {
+    if (final) {
       removeLive(side);
       showPill(side);
-      const prompt = detected === 'zh'
-        ? LANGS[currentLang].toTarget
-        : LANGS[currentLang].toZh;
-      commitMsg(side, final.trim(), prompt);
+      const prompt  = detected === 'zh' ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
+      const ttsLang = detected === 'zh' ? LANGS[currentLang].ttsLang : 'zh-TW';
+      commitMsg(side, final, prompt, ttsLang);
     }
   };
 
   r.onerror = e => {
-    if (e.error === 'not-allowed') {
-      showWarn('⚠ 麥克風權限被拒絕');
-      stopSession();
-    }
-    // no-speech / audio-capture 等錯誤不處理，onend 會自動重啟
+    if (e.error === 'not-allowed') { showWarn('⚠ 麥克風權限被拒絕'); stopSession(); }
+    // no-speech / audio-capture → onend 自動重啟
   };
 
   r.onend = () => {
     if (!isLive) return;
-    // 切換辨識語言，讓下一輪辨識另一種語言
-    recLang = recLang === 'zh' ? 'target' : 'zh';
-    setTimeout(startRecognition, 80);
+    recMode = recMode === 'zh' ? 'target' : 'zh';
+    // TTS 播放中時不啟動辨識（避免自己的聲音被收進去）
+    if (!ttsSpeaking) setTimeout(startRec, 80);
   };
 
   try { r.start(); } catch(e) {}
 }
 
-// ─── Live preview bubble ──────────────────────────────────────────────────────
+// ─── Commit message ───────────────────────────────────────────────────────────
+function commitMsg(side, text, prompt, ttsLang) {
+  const cfg = LANGS[currentLang];
+  const who = side === 'a' ? '說話者 A（中文）' : `說話者 B（${cfg.label}）`;
+
+  const el = document.createElement('div');
+  el.className = `msg ${side}`;
+  el.innerHTML = `
+    <div class="msg-who">${who}</div>
+    <div class="msg-bubble">
+      <div class="msg-orig">${esc(text)}</div>
+      <div class="msg-div"></div>
+      <div class="msg-tling">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <span>翻譯中</span>
+      </div>
+    </div>`;
+  document.getElementById('chat').appendChild(el);
+  scrollChat();
+  setSubOrig(text);
+  setSubTl('…', side);
+
+  doTranslate(text, prompt).then(result => {
+    const tling = el.querySelector('.msg-tling');
+    if (tling) {
+      const d = document.createElement('div');
+      d.className = 'msg-tl';
+      d.textContent = result;
+      tling.replaceWith(d);
+      if (!isMuted && hasTTS) enqueueTTS(result, ttsLang, d);
+    }
+    setSubTl(result, side);
+    scrollChat();
+  });
+}
+
+// ─── TTS Queue ────────────────────────────────────────────────────────────────
+function enqueueTTS(text, lang, labelEl) {
+  ttsQueue.push({ text, lang, labelEl });
+  if (!ttsSpeaking) drainTTS();
+}
+
+function drainTTS() {
+  if (ttsQueue.length === 0) {
+    ttsSpeaking = false;
+    // TTS 結束，恢復辨識
+    if (isLive && !rec) setTimeout(startRec, 150);
+    return;
+  }
+  ttsSpeaking = true;
+
+  // 暫停辨識，避免 TTS 聲音被麥克風收進去
+  killRec();
+
+  const { text, lang, labelEl } = ttsQueue.shift();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = lang;
+  utt.rate = 0.95;
+  utt.volume = 1;
+
+  // 選取最接近的語音
+  const voices = speechSynthesis.getVoices();
+  const voice = voices.find(v => v.lang === lang)
+             || voices.find(v => v.lang.startsWith(lang.split('-')[0]));
+  if (voice) utt.voice = voice;
+
+  if (labelEl) labelEl.classList.add('speaking');
+
+  const done = () => {
+    if (labelEl) labelEl.classList.remove('speaking');
+    setTimeout(drainTTS, 150);
+  };
+  utt.onend = done;
+  utt.onerror = done;
+
+  speechSynthesis.speak(utt);
+}
+
+// ─── Translate API ────────────────────────────────────────────────────────────
+async function doTranslate(text, prompt) {
+  try {
+    const res = await fetch('/.netlify/functions/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: '你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。' },
+          { role: 'user',   content: `${prompt}\n\n${text}` }
+        ]
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || '翻譯失敗');
+    return data.choices?.[0]?.message?.content?.trim() || '（翻譯失敗）';
+  } catch(err) {
+    return `（錯誤：${err.message}）`;
+  }
+}
+
+// ─── Live bubble ──────────────────────────────────────────────────────────────
 function showLive(side, text) {
   let el = side === 'a' ? liveElA : liveElB;
   if (!el) {
@@ -546,72 +649,10 @@ function removeLive(side) {
   if (side === 'b' && liveElB) { liveElB.remove(); liveElB = null; }
 }
 
-// ─── Commit final message ─────────────────────────────────────────────────────
-function commitMsg(side, text, prompt) {
-  const chat = document.getElementById('chat');
-  const cfg = LANGS[currentLang];
-  const who = side === 'a'
-    ? '說話者 A（中文）'
-    : `說話者 B（${cfg.label}）`;
-
-  const el = document.createElement('div');
-  el.className = `msg ${side}`;
-  el.innerHTML = `
-    <div class="msg-who">${who}</div>
-    <div class="msg-bubble">
-      <div class="msg-orig">${esc(text)}</div>
-      <div class="msg-div"></div>
-      <div class="msg-tling">
-        <div class="dots"><span></span><span></span><span></span></div>
-        <span>翻譯中</span>
-      </div>
-    </div>`;
-  chat.appendChild(el);
-  scrollChat();
-
-  setSubOrig(text);
-  setSubTl('…', side);
-
-  doTranslate(text, prompt).then(result => {
-    const tl = el.querySelector('.msg-tling');
-    if (tl) {
-      const d = document.createElement('div');
-      d.className = 'msg-tl';
-      d.textContent = result;
-      tl.replaceWith(d);
-    }
-    setSubTl(result, side);
-    scrollChat();
-  });
-}
-
-// ─── API call ─────────────────────────────────────────────────────────────────
-async function doTranslate(text, prompt) {
-  try {
-    const res = await fetch('/.netlify/functions/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: '你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。' },
-          { role: 'user', content: `${prompt}\n\n${text}` }
-        ]
-      })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || '翻譯失敗');
-    return data.choices?.[0]?.message?.content?.trim() || '（翻譯失敗）';
-  } catch(err) {
-    return `（錯誤：${err.message}）`;
-  }
-}
-
 // ─── Subtitle ─────────────────────────────────────────────────────────────────
 function setSubOrig(text) {
   clearTimeout(subTimer);
-  const el = document.getElementById('subOrig');
-  el.textContent = text;
-  el.style.color = '#fff';
+  document.getElementById('subOrig').textContent = text;
 }
 function setSubTl(text, side) {
   const el = document.getElementById('subTl');
@@ -627,7 +668,7 @@ function fadeSubtitle() {
   }, 5000);
 }
 
-// ─── Pill indicators ──────────────────────────────────────────────────────────
+// ─── Pills ────────────────────────────────────────────────────────────────────
 let pillTimer = null;
 function showPill(side) {
   clearTimeout(pillTimer);
@@ -643,17 +684,20 @@ function hidePills() {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function scrollChat() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
-
 function clearChat() {
   document.getElementById('chat').innerHTML =
     '<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
   document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
   document.getElementById('subTl').textContent = '';
+  speechSynthesis.cancel(); ttsQueue = []; ttsSpeaking = false;
 }
-
-function showWarn(msg) { const e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
-
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showWarn(msg) {
+  const e = document.getElementById('warnBar');
+  e.textContent = msg; e.style.display = 'block';
+}
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 </script>
 </body>
 </html>
