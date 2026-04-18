@@ -310,13 +310,65 @@ function drainTTS(){
   },150);
 }
 
-async function doTranslate(text,prompt){
-  try{
-    const res=await fetch('/.netlify/functions/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:[{role:'system',content:'你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。'},{role:'user',content:`${prompt}\n\n${text}`}]})});
-    const data=await res.json();
-    if(!res.ok)throw new Error(data.error||'翻譯失敗');
-    return data.choices?.[0]?.message?.content?.trim()||'（翻譯失敗）';
-  }catch(err){return`（錯誤：${err.message}）`;}
+async function doTranslate(text, prompt) {
+
+  const payload = {
+    messages: [
+      {
+        role: 'system',
+        content: '你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。'
+      },
+      {
+        role: 'user',
+        content: `${prompt}\n\n${text}`
+      }
+    ]
+  };
+
+  // 👉 API 清單（順序 = 優先順序）
+  const APIS = [
+    {
+      name: 'Render',
+      url: '/api/translate'
+    },
+    {
+      name: 'Netlify',
+      url: '/.netlify/functions/translate'
+    }
+  ];
+
+  let lastError = '';
+
+  for (const api of APIS) {
+    try {
+      const res = await fetch(api.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || `${api.name} API 錯誤`);
+      }
+
+      const result = data.choices?.[0]?.message?.content?.trim();
+
+      if (!result) {
+        throw new Error(`${api.name} 回傳格式錯誤`);
+      }
+
+      console.log(`✅ 使用 ${api.name}`);
+      return result;
+
+    } catch (err) {
+      console.warn(`❌ ${api.name} 失敗:`, err.message);
+      lastError = `${api.name}: ${err.message}`;
+    }
+  }
+
+  return `（錯誤：全部 API 失敗 → ${lastError}）`;
 }
 
 function updateLiveEl(text){
