@@ -3,11 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>即時翻譯系統 Pro 商用版</title>
-
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0d0d0d">
+<title>即時翻譯系統｜工廠穩定版</title>
 
 <style>
 :root{
@@ -23,20 +19,21 @@
 body{background:var(--bg);color:var(--text);overflow:hidden}
 .app{display:flex;flex-direction:column;height:100vh;max-width:720px;margin:auto}
 .top{padding:10px;background:var(--surface);display:flex;gap:6px}
-.tab{padding:6px 12px;border:1px solid var(--border);border-radius:18px;font-size:12px;color:var(--dim);cursor:pointer}
-.tab.active{border-color:var(--a);color:var(--a)}
+.tab{padding:6px 12px;border:1px solid var(--border);border-radius:18px;font-size:12px;color:var(--dim)}
+.tab.active{color:var(--a);border-color:var(--a)}
 .chat{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
 .msg{max-width:85%;padding:10px;border-radius:12px}
 .a{align-self:flex-start;background:rgba(77,182,255,.12)}
 .b{align-self:flex-end;background:rgba(255,112,67,.12)}
 .bottom{padding:14px;background:var(--surface);display:flex;flex-direction:column;align-items:center;gap:8px}
-.btn{width:72px;height:72px;border-radius:50%;border:2px solid #3a3;background:#1a2a1a}
+.btn{width:74px;height:74px;border-radius:50%;border:2px solid #3a3;background:#1a2a1a}
 .btn.live{border-color:#f55;background:rgba(255,80,80,.15)}
 .status{font-size:12px;color:var(--dim)}
-.small{font-size:11px;color:#666}
 </style>
+
 </head>
 <body>
+
 <div class="app">
 
 <div class="top">
@@ -49,26 +46,18 @@ body{background:var(--bg);color:var(--text);overflow:hidden}
 <div class="chat" id="chat"></div>
 
 <div class="bottom">
-<div class="status" id="status">商用系統待機</div>
+<div class="status" id="status">待機中</div>
 <button class="btn" id="btn" onclick="toggle()"></button>
-<div class="small" id="net">ONLINE</div>
 </div>
 
 </div>
 
 <script>
 /* =====================
- 商用架構核心
+ 工廠穩定核心（不卡頓版）
 ===================== */
 
-const CONFIG={
- apiPrimary:'/api/translate',
- apiBackup:'/.netlify/functions/translate',
- ws:'wss://your-server.com/ws',
- offlineMode:true
-};
-
-const LANGS={
+const LANG={
  vi:{sr:'vi-VN'},
  id:{sr:'id-ID'},
  th:{sr:'th-TH'},
@@ -78,30 +67,13 @@ const LANGS={
 let lang='vi';
 let live=false;
 let rec=null;
-let ws=null;
+let speaking=false;
+let queue=[];
 let memory=[];
-const MAX_MEMORY=8;
+const MAX_MEMORY=3;
 
 /* =====================
- PWA Service Worker
-===================== */
-if('serviceWorker' in navigator){
- navigator.serviceWorker.register('sw.js').catch(()=>{});
-}
-
-/* =====================
- WebSocket (可升級多人會議)
-===================== */
-function connectWS(){
- try{
-  ws=new WebSocket(CONFIG.ws);
-  ws.onopen=()=>console.log('WS connected');
-  ws.onmessage=e=>console.log('WS:',e.data);
- }catch(e){console.log('WS fail');}
-}
-
-/* =====================
- 語言設定
+ UI
 ===================== */
 function setLang(l,el){
  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
@@ -109,43 +81,31 @@ function setLang(l,el){
  lang=l;
 }
 
-/* =====================
- 啟動
-===================== */
 function toggle(){live?stop():start();}
 
 function start(){
  live=true;
  document.getElementById('btn').classList.add('live');
- document.getElementById('status').textContent='運行中 (商用模式)';
- connectWS();
+ document.getElementById('status').textContent='運行中';
  loop();
 }
 
 function stop(){
  live=false;
  if(rec)rec.abort();
- if(ws)ws.close();
+ speechSynthesis.cancel();
+ queue=[];
+ speaking=false;
  document.getElementById('btn').classList.remove('live');
- document.getElementById('status').textContent='已停止';
+ document.getElementById('status').textContent='停止';
 }
 
 /* =====================
- 語音識別（自動說話者）
+ 語音識別（穩定版）
 ===================== */
-function detectSpeaker(text){
- let zh=0,en=0;
- for(const c of text){
-  const cp=c.codePointAt(0);
-  if(cp>0x4E00&&cp<0x9FFF)zh++;
-  else en++;
- }
- return zh>en?'zh':'foreign';
-}
-
 function loop(){
- if(!live)return;
- if(rec)rec.abort();
+ if(!live) return;
+ if(rec) rec.abort();
 
  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
  rec=new SR();
@@ -153,44 +113,66 @@ function loop(){
  rec.continuous=true;
  rec.interimResults=true;
 
- rec.onresult=async e=>{
+ rec.onresult=e=>{
   for(let i=e.resultIndex;i<e.results.length;i++){
    const t=e.results[i][0].transcript.trim();
    if(!t)continue;
-   if(e.results[i].isFinal)await process(t);
+   if(e.results[i].isFinal) handle(t);
   }
  };
 
- rec.onend=()=>{if(live)loop();};
+ rec.onend=()=>{ if(live && !speaking) loop(); };
  rec.start();
 }
 
 /* =====================
- AI 翻譯（含記憶）
+ 翻譯流程（低延遲）
 ===================== */
-async function process(text){
- const side=detectSpeaker(text);
- const isZh=side==='zh';
+async function handle(text){
 
- memory.push({text});
- if(memory.length>MAX_MEMORY)memory.shift();
+ const isZh = /[\u4e00-\u9fff]/.test(text);
+ const prompt = isZh
+  ? `翻成${lang}`
+  : `翻成繁體中文`;
 
- const prompt=isZh?
- buildPrompt('toForeign'):
- buildPrompt('toZh');
+ memory.push(text);
+ if(memory.length>MAX_MEMORY) memory.shift();
 
- const result=await translate(text,prompt);
+ const result = await translate(text,prompt);
 
  add(text,result,isZh);
- speak(result,isZh?LANGS[lang].sr:'zh-TW');
+ speak(result,isZh?LANG[lang].sr:'zh-TW');
 }
 
-function buildPrompt(type){
- const history=memory.map(m=>m.text).join('\n');
- if(type==='toForeign'){
-  return `根據對話上下文翻譯成${lang}，保持自然語氣:\n${history}`;
- }
- return `翻譯成繁體中文:\n${history}`;
+/* =====================
+ TTS（防掉聲音核心）
+===================== */
+function speak(text,lang){
+
+ speaking = true;
+
+ if(rec) rec.abort(); // 關鍵：避免搶音訊
+
+ speechSynthesis.cancel();
+
+ const u = new SpeechSynthesisUtterance(text);
+ const voices = speechSynthesis.getVoices();
+
+ u.voice = voices.find(v=>v.lang===lang) || null;
+ u.lang = lang;
+ u.rate = 0.95;
+
+ u.onend = () => {
+  speaking = false;
+  if(live) setTimeout(loop,120);
+ };
+
+ u.onerror = () => {
+  speaking = false;
+  if(live) setTimeout(loop,120);
+ };
+
+ speechSynthesis.speak(u);
 }
 
 /* =====================
@@ -203,49 +185,26 @@ function add(o,t,zh){
  document.getElementById('chat').appendChild(d);
 }
 
-function speak(text,lang){
- const u=new SpeechSynthesisUtterance(text);
- u.lang=lang;
- speechSynthesis.speak(u);
-}
-
 /* =====================
- 翻譯 API (雙備援)
+ 翻譯 API（極簡低延遲）
 ===================== */
 async function translate(text,prompt){
+
  const payload={messages:[
-  {role:'system',content:'專業即時翻譯，只輸出結果'},
+  {role:'system',content:'只輸出翻譯'},
   {role:'user',content:prompt+'\n'+text}
  ]};
 
- for(const url of [CONFIG.apiPrimary,CONFIG.apiBackup]){
-  try{
-   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-   const j=await r.json();
-   return j.choices[0].message.content;
-  }catch(e){console.log('fail',url)}
+ try{
+  const r=await fetch('/api/translate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const j=await r.json();
+  return j.choices[0].message.content;
+ }catch(e){
+  return '[離線] '+text;
  }
-
- return offline(text);
 }
 
-/* =====================
- 離線模式
-===================== */
-function offline(t){
- document.getElementById('net').textContent='OFFLINE';
- return '[離線翻譯] '+t;
-}
 </script>
 
 </body>
 </html>
-
-<!-- 商用版特性：
-1. WebSocket 多人擴展架構
-2. AI 記憶翻譯（上下文）
-3. 雙 API failover
-4. PWA 可安裝 App
-5. 自動說話者辨識
-6. 離線 fallback
--->
