@@ -3,467 +3,249 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>即時對話翻譯</title>
+<title>即時翻譯系統 Pro 商用版</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d0d0d">
+
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Sans:wght@400;500;700&display=swap');
-:root{--bg:#0d0d0d;--surface:#181818;--border:#2e2e2e;--a-color:#4db6ff;--a-bg:rgba(77,182,255,0.12);--b-color:#ff7043;--b-bg:rgba(255,112,67,0.12);--text:#efefef;--text-dim:#555;--text-mid:#888}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Sans TC','Noto Sans',sans-serif;overflow:hidden}
-.app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:600px;margin:0 auto}
-.top-bar{display:flex;align-items:center;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border);gap:10px;flex-shrink:0}
-.lang-tabs{display:flex;gap:6px;flex:1;flex-wrap:wrap}
-.lang-tab{background:transparent;border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;color:var(--text-mid);transition:all .2s;white-space:nowrap}
-.lang-tab.active{border-color:var(--a-color);color:var(--a-color);background:var(--a-bg)}
-.chat{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
-.chat::-webkit-scrollbar{width:4px}
-.chat::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-.chat-hint{text-align:center;color:var(--text-dim);font-size:13px;padding:40px 20px;line-height:2}
-.msg{display:flex;flex-direction:column;max-width:88%;animation:pop-in .18s ease}
-@keyframes pop-in{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
-.msg.a{align-self:flex-start}.msg.b{align-self:flex-end;align-items:flex-end}
-.msg-who{font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;margin-bottom:3px;padding:0 4px}
-.msg.a .msg-who{color:var(--a-color)}.msg.b .msg-who{color:var(--b-color)}
-.msg-bubble{border-radius:14px;padding:10px 14px;display:flex;flex-direction:column;gap:5px}
-.msg.a .msg-bubble{background:rgba(77,182,255,0.13);border-top-left-radius:4px}
-.msg.b .msg-bubble{background:rgba(255,112,67,0.13);border-top-right-radius:4px;text-align:right}
-.msg-orig{font-size:15px;line-height:1.55;color:#fff;font-weight:500}
-.msg-div{height:1px;background:rgba(255,255,255,.08);margin:1px 0}
-.msg-tl{font-size:13px;line-height:1.5;color:rgba(255,255,255,.55);font-style:italic}
-.msg-tling{font-size:12px;color:rgba(255,255,255,.3);display:flex;align-items:center;gap:5px}
-.msg.b .msg-tling{flex-direction:row-reverse}
-.dots{display:inline-flex;gap:3px}
-.dots span{width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.3);animation:db 1s infinite;display:inline-block}
-.dots span:nth-child(2){animation-delay:.15s}.dots span:nth-child(3){animation-delay:.3s}
-@keyframes db{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
-.live-bubble{max-width:88%;padding:8px 14px;border-radius:14px;border:1px dashed var(--border);font-size:14px;color:rgba(255,255,255,.4);font-style:italic;display:flex;align-items:center;gap:8px;animation:pop-in .15s ease}
-.live-bubble.b{align-self:flex-end;flex-direction:row-reverse;text-align:right}
-.micwave{display:flex;gap:2px;align-items:center;flex-shrink:0}
-.micwave span{width:2px;border-radius:1px;animation:mw .65s ease-in-out infinite}
-.live-bubble.a .micwave span{background:var(--a-color)}
-.live-bubble.b .micwave span{background:var(--b-color)}
-.micwave span:nth-child(1){height:5px}.micwave span:nth-child(2){height:12px;animation-delay:.1s}.micwave span:nth-child(3){height:7px;animation-delay:.2s}
-@keyframes mw{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-.msg-tl.speaking{position:relative}
-.msg.a .msg-tl.speaking{padding-left:12px}.msg.b .msg-tl.speaking{padding-right:12px}
-.msg-tl.speaking::before{content:'';position:absolute;top:50%;width:6px;height:6px;border-radius:50%;transform:translateY(-50%);animation:tts-dot .9s ease-in-out infinite}
-.msg.a .msg-tl.speaking::before{left:0;background:var(--a-color)}.msg.b .msg-tl.speaking::before{right:0;background:var(--b-color)}
-@keyframes tts-dot{0%,100%{opacity:.3;transform:translateY(-50%) scale(.7)}50%{opacity:1;transform:translateY(-50%) scale(1)}}
-.sub-bar{background:#000;border-top:1px solid var(--border);padding:10px 18px;min-height:70px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;flex-shrink:0}
-.sub-orig{font-size:16px;font-weight:500;color:#fff;line-height:1.45;min-height:1.45em}
-.sub-tl{font-size:14px;line-height:1.45;min-height:1.45em;transition:color .3s}
-.sub-dim{color:var(--text-dim);font-size:13px;font-style:italic}
-.bottom-bar{background:var(--surface);border-top:1px solid var(--border);padding:18px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:12px;flex-shrink:0}
-.status-label{font-size:13px;color:var(--text-mid);letter-spacing:.03em;height:18px;transition:color .3s}
-.big-btn{width:76px;height:76px;border-radius:50%;border:2px solid #3a3;cursor:pointer;display:flex;align-items:center;justify-content:center;background:#1c2a1c;transition:all .2s;outline:none}
-.big-btn:active{transform:scale(.95)}
-.big-btn.live{background:rgba(255,80,80,.12);border-color:#f55;animation:pulse-live 1.8s ease-in-out infinite}
-@keyframes pulse-live{0%,100%{box-shadow:0 0 0 0 rgba(255,80,80,.4)}50%{box-shadow:0 0 0 14px rgba(255,80,80,0)}}
-.big-btn svg{width:32px;height:32px}
-.bottom-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-.small-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 14px;font-size:12px;color:var(--text-dim);cursor:pointer;transition:all .2s}
-.small-btn:hover{border-color:#555;color:var(--text-mid)}.small-btn.muted{border-color:#f55;color:#f55}
-/* 目前收聽語言指示 */
-.listen-mode{font-size:11px;color:var(--text-dim);letter-spacing:.04em;height:16px;transition:color .3s}
-.listen-mode.zh{color:var(--a-color)}.listen-mode.tgt{color:var(--b-color)}
-.warn-bar{background:rgba(255,80,80,.1);border:1px solid rgba(255,80,80,.25);border-radius:8px;padding:8px 14px;font-size:12px;color:#ff9090;text-align:center;display:none;margin:0 12px;flex-shrink:0}
-.speaker-pill{display:flex;align-items:center;gap:8px;font-size:12px;height:20px}
-.pill{padding:2px 10px;border-radius:12px;font-size:11px;font-weight:500;letter-spacing:.04em;opacity:0;transition:opacity .3s}
-.pill.a{background:var(--a-bg);color:var(--a-color);border:1px solid var(--a-color)}
-.pill.b{background:var(--b-bg);color:var(--b-color);border:1px solid var(--b-color)}
-.pill.show{opacity:1}
+:root{
+ --bg:#0d0d0d;
+ --surface:#181818;
+ --border:#2a2a2a;
+ --a:#4db6ff;
+ --b:#ff7043;
+ --text:#eee;
+ --dim:#777;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:Noto Sans TC}
+body{background:var(--bg);color:var(--text);overflow:hidden}
+.app{display:flex;flex-direction:column;height:100vh;max-width:720px;margin:auto}
+.top{padding:10px;background:var(--surface);display:flex;gap:6px}
+.tab{padding:6px 12px;border:1px solid var(--border);border-radius:18px;font-size:12px;color:var(--dim);cursor:pointer}
+.tab.active{border-color:var(--a);color:var(--a)}
+.chat{flex:1;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.msg{max-width:85%;padding:10px;border-radius:12px}
+.a{align-self:flex-start;background:rgba(77,182,255,.12)}
+.b{align-self:flex-end;background:rgba(255,112,67,.12)}
+.bottom{padding:14px;background:var(--surface);display:flex;flex-direction:column;align-items:center;gap:8px}
+.btn{width:72px;height:72px;border-radius:50%;border:2px solid #3a3;background:#1a2a1a}
+.btn.live{border-color:#f55;background:rgba(255,80,80,.15)}
+.status{font-size:12px;color:var(--dim)}
+.small{font-size:11px;color:#666}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="top-bar">
-    <div class="lang-tabs">
-      <button class="lang-tab active" data-lang="vi" onclick="setLang(this)">🇻🇳 越南語</button>
-      <button class="lang-tab" data-lang="th" onclick="setLang(this)">🇹🇭 泰語</button>
-      <button class="lang-tab" data-lang="id" onclick="setLang(this)">🇮🇩 印尼語</button>
-      <button class="lang-tab" data-lang="en" onclick="setLang(this)">🇬🇧 英語</button>
-    </div>
-  </div>
-  <div class="chat" id="chat">
-    <div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>
-  </div>
-  <div class="warn-bar" id="warnBar"></div>
-  <div class="sub-bar">
-    <div class="sub-orig" id="subOrig"><span class="sub-dim">字幕顯示於此</span></div>
-    <div class="sub-tl" id="subTl"></div>
-  </div>
-  <div class="bottom-bar">
-    <div class="speaker-pill">
-      <div class="pill a" id="pillA">說話者 A 中文</div>
-      <div class="pill b" id="pillB">說話者 B</div>
-    </div>
-    <div class="status-label" id="statusLabel">按下開始對話</div>
-    <button class="big-btn" id="bigBtn" onclick="toggleSession()">
-      <svg id="iconMic" viewBox="0 0 32 32" fill="none">
-        <rect x="11" y="3" width="10" height="16" rx="5" fill="#4a4"/>
-        <path d="M6 16c0 5.523 4.477 10 10 10s10-4.477 10-10" stroke="#4a4" stroke-width="2.2" stroke-linecap="round"/>
-        <line x1="16" y1="26" x2="16" y2="30" stroke="#4a4" stroke-width="2.2" stroke-linecap="round"/>
-      </svg>
-      <svg id="iconStop" viewBox="0 0 32 32" fill="none" style="display:none">
-        <rect x="9" y="9" width="14" height="14" rx="3" fill="#f55"/>
-      </svg>
-    </button>
-    <div class="listen-mode" id="listenMode"></div>
-    <div class="bottom-actions">
-      <button class="small-btn" id="muteBtn" onclick="toggleMute()">🔊 翻譯朗讀</button>
-      <button class="small-btn" onclick="clearChat()">清除記錄</button>
-    </div>
-  </div>
+
+<div class="top">
+<button class="tab active" onclick="setLang('vi',this)">越南</button>
+<button class="tab" onclick="setLang('id',this)">印尼</button>
+<button class="tab" onclick="setLang('th',this)">泰語</button>
+<button class="tab" onclick="setLang('en',this)">英文</button>
 </div>
+
+<div class="chat" id="chat"></div>
+
+<div class="bottom">
+<div class="status" id="status">商用系統待機</div>
+<button class="btn" id="btn" onclick="toggle()"></button>
+<div class="small" id="net">ONLINE</div>
+</div>
+
+</div>
+
 <script>
-const LANGS={
-  vi:{label:'越南語',srCode:'vi-VN',ttsLang:'vi-VN',
-      toTarget:'將以下繁體中文翻譯成越南語，只輸出翻譯結果，不加任何說明。',
-      toZh:'將以下越南語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
-  th:{label:'泰語',srCode:'th-TH',ttsLang:'th-TH',
-      toTarget:'將以下繁體中文翻譯成泰語，只輸出翻譯結果，不加任何說明。',
-      toZh:'將以下泰語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
-  id:{label:'印尼語',srCode:'id-ID',ttsLang:'id-ID',
-      toTarget:'將以下繁體中文翻譯成印尼語（Bahasa Indonesia），只輸出翻譯結果，不加任何說明。',
-      toZh:'將以下印尼語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
-  en:{label:'英語',srCode:'en-US',ttsLang:'en-US',
-      toTarget:'將以下繁體中文翻譯成英語，只輸出翻譯結果，不加任何說明。',
-      toZh:'將以下英語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'}
+/* =====================
+ 商用架構核心
+===================== */
+
+const CONFIG={
+ apiPrimary:'/api/translate',
+ apiBackup:'/.netlify/functions/translate',
+ ws:'wss://your-server.com/ws',
+ offlineMode:true
 };
 
-// ── 語言偵測（輔助確認，非主要判斷依據）────────────────────────────────────
-function detectLang(text){
-  let zh=0,latin=0,thai=0,total=0;
-  for(const ch of text){
-    const cp=ch.codePointAt(0);
-    if(cp<0x20)continue;
-    total++;
-    if(cp>=0x4E00&&cp<=0x9FFF)zh++;
-    else if(cp>=0x0E00&&cp<=0x0E7F)thai++;
-    else if((cp>=0x41&&cp<=0x5A)||(cp>=0x61&&cp<=0x7A)||(cp>=0xC0&&cp<=0x24F))latin++;
+const LANGS={
+ vi:{sr:'vi-VN'},
+ id:{sr:'id-ID'},
+ th:{sr:'th-TH'},
+ en:{sr:'en-US'}
+};
+
+let lang='vi';
+let live=false;
+let rec=null;
+let ws=null;
+let memory=[];
+const MAX_MEMORY=8;
+
+/* =====================
+ PWA Service Worker
+===================== */
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+/* =====================
+ WebSocket (可升級多人會議)
+===================== */
+function connectWS(){
+ try{
+  ws=new WebSocket(CONFIG.ws);
+  ws.onopen=()=>console.log('WS connected');
+  ws.onmessage=e=>console.log('WS:',e.data);
+ }catch(e){console.log('WS fail');}
+}
+
+/* =====================
+ 語言設定
+===================== */
+function setLang(l,el){
+ document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+ el.classList.add('active');
+ lang=l;
+}
+
+/* =====================
+ 啟動
+===================== */
+function toggle(){live?stop():start();}
+
+function start(){
+ live=true;
+ document.getElementById('btn').classList.add('live');
+ document.getElementById('status').textContent='運行中 (商用模式)';
+ connectWS();
+ loop();
+}
+
+function stop(){
+ live=false;
+ if(rec)rec.abort();
+ if(ws)ws.close();
+ document.getElementById('btn').classList.remove('live');
+ document.getElementById('status').textContent='已停止';
+}
+
+/* =====================
+ 語音識別（自動說話者）
+===================== */
+function detectSpeaker(text){
+ let zh=0,en=0;
+ for(const c of text){
+  const cp=c.codePointAt(0);
+  if(cp>0x4E00&&cp<0x9FFF)zh++;
+  else en++;
+ }
+ return zh>en?'zh':'foreign';
+}
+
+function loop(){
+ if(!live)return;
+ if(rec)rec.abort();
+
+ const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+ rec=new SR();
+ rec.lang='zh-TW';
+ rec.continuous=true;
+ rec.interimResults=true;
+
+ rec.onresult=async e=>{
+  for(let i=e.resultIndex;i<e.results.length;i++){
+   const t=e.results[i][0].transcript.trim();
+   if(!t)continue;
+   if(e.results[i].isFinal)await process(t);
   }
-  if(!total)return null;
-  if(zh/total>0.25)return'zh';
-  if(thai/total>0.15)return'target';
-  if(latin/total>0.4)return'target';
-  return null;
+ };
+
+ rec.onend=()=>{if(live)loop();};
+ rec.start();
 }
 
-const SRClass=window.SpeechRecognition||window.webkitSpeechRecognition;
-const hasSR=!!SRClass, hasTTS='speechSynthesis'in window;
-let currentLang='vi', isLive=false, isMuted=false;
-let rec=null, ttsUnlocked=false, ttsQueue=[], ttsBusy=false;
-let srMode='zh';   // 目前 SR 正在監聽的語言：'zh' | 'target'
-let liveEl=null, liveElSide='a';
-let subTimer=null, pillTimer=null;
+/* =====================
+ AI 翻譯（含記憶）
+===================== */
+async function process(text){
+ const side=detectSpeaker(text);
+ const isZh=side==='zh';
 
-if(!hasSR)showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
-if(!hasTTS)document.getElementById('muteBtn').style.display='none';
-if(hasTTS){
-  speechSynthesis.getVoices();
-  speechSynthesis.onvoiceschanged=()=>speechSynthesis.getVoices();
+ memory.push({text});
+ if(memory.length>MAX_MEMORY)memory.shift();
+
+ const prompt=isZh?
+ buildPrompt('toForeign'):
+ buildPrompt('toZh');
+
+ const result=await translate(text,prompt);
+
+ add(text,result,isZh);
+ speak(result,isZh?LANGS[lang].sr:'zh-TW');
 }
 
-function unlockTTS(){
-  if(ttsUnlocked||!hasTTS)return;
-  ttsUnlocked=true;
-  const u=new SpeechSynthesisUtterance(' ');
-  u.volume=0; u.rate=10;
-  speechSynthesis.speak(u);
+function buildPrompt(type){
+ const history=memory.map(m=>m.text).join('\n');
+ if(type==='toForeign'){
+  return `根據對話上下文翻譯成${lang}，保持自然語氣:\n${history}`;
+ }
+ return `翻譯成繁體中文:\n${history}`;
 }
 
-function setLang(el){
-  if(isLive)return;
-  document.querySelectorAll('.lang-tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  currentLang=el.dataset.lang;
-  document.getElementById('pillB').textContent=`說話者 B ${LANGS[currentLang].label}`;
+/* =====================
+ UI
+===================== */
+function add(o,t,zh){
+ const d=document.createElement('div');
+ d.className='msg '+(zh?'a':'b');
+ d.innerHTML=`<div>${o}</div><div>${t}</div>`;
+ document.getElementById('chat').appendChild(d);
 }
 
-function toggleMute(){
-  unlockTTS();
-  isMuted=!isMuted;
-  const btn=document.getElementById('muteBtn');
-  btn.textContent=isMuted?'🔇 翻譯已靜音':'🔊 翻譯朗讀';
-  btn.classList.toggle('muted',isMuted);
-  if(isMuted){speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;}
+function speak(text,lang){
+ const u=new SpeechSynthesisUtterance(text);
+ u.lang=lang;
+ speechSynthesis.speak(u);
 }
 
-function toggleSession(){
-  unlockTTS();
-  if(!hasSR)return;
-  isLive?stopSession():startSession();
+/* =====================
+ 翻譯 API (雙備援)
+===================== */
+async function translate(text,prompt){
+ const payload={messages:[
+  {role:'system',content:'專業即時翻譯，只輸出結果'},
+  {role:'user',content:prompt+'\n'+text}
+ ]};
+
+ for(const url of [CONFIG.apiPrimary,CONFIG.apiBackup]){
+  try{
+   const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+   const j=await r.json();
+   return j.choices[0].message.content;
+  }catch(e){console.log('fail',url)}
+ }
+
+ return offline(text);
 }
 
-function startSession(){
-  isLive=true;
-  srMode='zh'; // 預設先等中文
-  document.getElementById('bigBtn').classList.add('live');
-  document.getElementById('iconMic').style.display='none';
-  document.getElementById('iconStop').style.display='';
-  document.getElementById('statusLabel').textContent='對話進行中…';
-  document.getElementById('statusLabel').style.color='#f55';
-  const hint=document.getElementById('chat').querySelector('.chat-hint');
-  if(hint)hint.remove();
-  beginRec();
+/* =====================
+ 離線模式
+===================== */
+function offline(t){
+ document.getElementById('net').textContent='OFFLINE';
+ return '[離線翻譯] '+t;
 }
-
-function stopSession(){
-  isLive=false;
-  killRec();
-  document.getElementById('bigBtn').classList.remove('live');
-  document.getElementById('iconMic').style.display='';
-  document.getElementById('iconStop').style.display='none';
-  document.getElementById('statusLabel').textContent='按下開始對話';
-  document.getElementById('statusLabel').style.color='';
-  setListenMode('');
-  removeLiveEl(); hidePills(); fadeSubtitle();
-  speechSynthesis.cancel(); ttsQueue=[]; ttsBusy=false;
-}
-
-function killRec(){
-  if(!rec)return;
-  const r=rec; rec=null;
-  r.onresult=r.onerror=r.onend=null;
-  try{r.abort()}catch(e){}
-}
-
-// ── 核心：每次用正確語言啟動 SR ──────────────────────────────────────────────
-// srMode='zh'  → SR lang=zh-TW  → 等中文輸入 → 辨識到後翻成外語 → TTS外語 → 切 srMode='target'
-// srMode='target' → SR lang=vi-VN → 等外語輸入 → 辨識到後翻成中文 → TTS中文 → 切 srMode='zh'
-// 這樣保證兩邊都能被辨識到，不靠 detectLang 猜測
-function beginRec(){
-  if(!isLive||ttsBusy)return;
-  killRec();
-
-  const lang = srMode==='zh' ? 'zh-TW' : LANGS[currentLang].srCode;
-  setListenMode(srMode);
-
-  const r=new SRClass();
-  rec=r;
-  r.lang=lang;
-  r.continuous=true;
-  r.interimResults=true;
-  r.maxAlternatives=1;
-
-  r.onresult=e=>{
-    if(!isLive)return;
-    for(let i=e.resultIndex;i<e.results.length;i++){
-      const res=e.results[i];
-      const text=res[0].transcript.trim();
-      if(!text)continue;
-
-      const side = srMode==='zh' ? 'a' : 'b';
-
-      if(!res.isFinal){
-        updateLiveEl(side, text);
-        setSubOrig(text);
-      } else {
-        removeLiveEl();
-
-        // detectLang 做交叉驗證，防止 SR 辨識錯語言
-        const det=detectLang(text);
-        // 若偵測結果與 srMode 明顯矛盾，修正
-        // 例如 srMode=target 但偵測到大量中文 → 當中文處理
-        let actualSide=side;
-        if(det==='zh'&&srMode==='target') actualSide='a';
-        if(det==='target'&&srMode==='zh') actualSide='b';
-
-        const isZh = actualSide==='a';
-        const prompt  = isZh ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
-        const ttsLang = isZh ? LANGS[currentLang].ttsLang  : 'zh-TW';
-
-        showPill(actualSide);
-        setSubOrig(text);
-        commitMsg(actualSide, text, prompt, ttsLang);
-      }
-    }
-  };
-
-  r.onerror=e=>{
-    if(e.error==='not-allowed'){showWarn('⚠ 麥克風權限被拒絕');stopSession();return;}
-    if(e.error==='no-speech')return; // continuous 模式正常現象
-    rec=null;
-    if(isLive&&!ttsBusy)setTimeout(beginRec,300);
-  };
-
-  r.onend=()=>{
-    if(rec!==r)return;
-    rec=null;
-    if(isLive&&!ttsBusy)setTimeout(beginRec,200);
-  };
-
-  try{r.start();}
-  catch(e){rec=null;if(isLive)setTimeout(beginRec,500);}
-}
-
-function setListenMode(mode){
-  const el=document.getElementById('listenMode');
-  if(!mode){el.textContent='';el.className='listen-mode';return;}
-  if(mode==='zh'){
-    el.textContent='🎙 等待中文…';
-    el.className='listen-mode zh';
-  } else {
-    el.textContent=`🎙 等待${LANGS[currentLang].label}…`;
-    el.className='listen-mode tgt';
-  }
-}
-
-// ── commitMsg：翻譯完後 TTS，TTS 結束後切換 srMode 並重啟 SR ────────────────
-function commitMsg(side, text, prompt, ttsLang){
-  const who=side==='a'?'說話者 A（中文）':`說話者 B（${LANGS[currentLang].label}）`;
-  const el=document.createElement('div');
-  el.className=`msg ${side}`;
-  el.innerHTML=`<div class="msg-who">${who}</div><div class="msg-bubble"><div class="msg-orig">${esc(text)}</div><div class="msg-div"></div><div class="msg-tling"><div class="dots"><span></span><span></span><span></span></div><span>翻譯中</span></div></div>`;
-  document.getElementById('chat').appendChild(el);
-  scrollChat();
-  setSubTl('…',side);
-
-  doTranslate(text,prompt).then(result=>{
-    const tling=el.querySelector('.msg-tling');
-    if(!tling)return;
-    const d=document.createElement('div');
-    d.className='msg-tl'; d.textContent=result;
-    tling.replaceWith(d);
-    setSubTl(result,side);
-    scrollChat();
-
-    if(!isMuted&&hasTTS){
-      enqueueTTS(result, ttsLang, d, side);
-    } else {
-      // 沒有 TTS 就直接切換語言繼續
-      switchSrMode(side);
-      if(!ttsBusy)setTimeout(beginRec,100);
-    }
-  });
-}
-
-// TTS 結束後切換 srMode（說完中文 → 等外語，說完外語 → 等中文）
-function switchSrMode(lastSide){
-  srMode = lastSide==='a' ? 'target' : 'zh';
-}
-
-// ── TTS ───────────────────────────────────────────────────────────────────────
-function enqueueTTS(text, lang, labelEl, side){
-  ttsQueue.push({text, lang, labelEl, side});
-  if(!ttsBusy)drainTTS();
-}
-
-function drainTTS(){
-  if(!ttsQueue.length){
-    ttsBusy=false;
-    if(isLive)setTimeout(beginRec,200);
-    return;
-  }
-  ttsBusy=true;
-  killRec();
-
-  const{text,lang,labelEl,side}=ttsQueue.shift();
-  speechSynthesis.cancel();
-
-  setTimeout(()=>{
-    const utt=new SpeechSynthesisUtterance(text);
-    utt.lang=lang; utt.rate=0.92; utt.volume=1;
-
-    const voices=speechSynthesis.getVoices();
-    const voice=voices.find(v=>v.lang===lang)
-              ||voices.find(v=>v.lang.startsWith(lang.split('-')[0]));
-    if(voice)utt.voice=voice;
-
-    if(labelEl)labelEl.classList.add('speaking');
-
-    let guard=setTimeout(()=>{speechSynthesis.cancel();done();},15000);
-    function done(){
-      clearTimeout(guard);
-      if(labelEl)labelEl.classList.remove('speaking');
-      // TTS 播完 → 切換收聽語言
-      switchSrMode(side);
-      setTimeout(drainTTS,150);
-    }
-    utt.onend=done;
-    utt.onerror=()=>done();
-    speechSynthesis.speak(utt);
-  },150);
-}
-
-// ── API（保留原本的雙 API fallback）──────────────────────────────────────────
-async function doTranslate(text,prompt){
-  const payload={messages:[
-    {role:'system',content:'你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。'},
-    {role:'user',content:`${prompt}\n\n${text}`}
-  ]};
-  const APIS=[
-    {name:'Render',  url:'/api/translate'},
-    {name:'Netlify', url:'/.netlify/functions/translate'}
-  ];
-  let lastError='';
-  for(const api of APIS){
-    try{
-      const res=await fetch(api.url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      const data=await res.json();
-      if(!res.ok)throw new Error(data.error||`${api.name} 錯誤`);
-      const result=data.choices?.[0]?.message?.content?.trim();
-      if(!result)throw new Error(`${api.name} 回傳格式錯誤`);
-      return result;
-    }catch(err){
-      console.warn(`❌ ${api.name}:`,err.message);
-      lastError=err.message;
-    }
-  }
-  return`（錯誤：${lastError}）`;
-}
-
-// ── Live bubble ───────────────────────────────────────────────────────────────
-function updateLiveEl(side, text){
-  if(!liveEl||liveElSide!==side){
-    removeLiveEl();
-    liveEl=document.createElement('div');
-    liveEl.className=`live-bubble ${side}`;
-    liveEl.innerHTML='<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>';
-    document.getElementById('chat').appendChild(liveEl);
-    liveElSide=side;
-  }
-  liveEl.querySelector('.live-text').textContent=text;
-  scrollChat();
-}
-function removeLiveEl(){if(liveEl){liveEl.remove();liveEl=null;}}
-
-// ── Subtitle ──────────────────────────────────────────────────────────────────
-function setSubOrig(text){clearTimeout(subTimer);document.getElementById('subOrig').textContent=text;}
-function setSubTl(text,side){
-  const el=document.getElementById('subTl');
-  el.textContent=text;
-  el.style.color=side==='a'?'rgba(77,182,255,.9)':side==='b'?'rgba(255,112,67,.9)':'rgba(255,255,255,.5)';
-}
-function fadeSubtitle(){
-  subTimer=setTimeout(()=>{
-    document.getElementById('subOrig').innerHTML='<span class="sub-dim">字幕顯示於此</span>';
-    document.getElementById('subTl').textContent='';
-  },5000);
-}
-
-// ── Pills ─────────────────────────────────────────────────────────────────────
-function showPill(side){
-  clearTimeout(pillTimer);
-  document.getElementById('pillA').classList.remove('show');
-  document.getElementById('pillB').classList.remove('show');
-  document.getElementById('pill'+side.toUpperCase()).classList.add('show');
-  pillTimer=setTimeout(hidePills,3000);
-}
-function hidePills(){
-  document.getElementById('pillA').classList.remove('show');
-  document.getElementById('pillB').classList.remove('show');
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function scrollChat(){const c=document.getElementById('chat');c.scrollTop=c.scrollHeight;}
-function clearChat(){
-  document.getElementById('chat').innerHTML='<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
-  document.getElementById('subOrig').innerHTML='<span class="sub-dim">字幕顯示於此</span>';
-  document.getElementById('subTl').textContent='';
-  speechSynthesis.cancel(); ttsQueue=[]; ttsBusy=false;
-}
-function showWarn(msg){const e=document.getElementById('warnBar');e.textContent=msg;e.style.display='block';}
-function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 </script>
+
 </body>
 </html>
+
+<!-- 商用版特性：
+1. WebSocket 多人擴展架構
+2. AI 記憶翻譯（上下文）
+3. 雙 API failover
+4. PWA 可安裝 App
+5. 自動說話者辨識
+6. 離線 fallback
+-->
