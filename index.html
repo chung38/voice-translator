@@ -175,6 +175,7 @@ let liveEl=null,liveElSide='a';
 let subTimer=null,pillTimer=null,silenceTimer=null;
 const SILENCE_MS=2500,CIRC=56.5;
 let ringRaf=null,ringStart=null;
+let gotFinal=false; // 這次辨識是否已拿到 final result
 
 if(!hasSR)showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
 if(!hasTTS)document.getElementById('muteBtn').style.display='none';
@@ -213,7 +214,6 @@ function setLang(el){
   el.classList.add('active');currentLang=el.dataset.lang;
   document.getElementById('pillB').textContent=`說話者 B ${LANGS[currentLang].label}`;
 }
-
 function toggleMute(){
   unlockTTS();isMuted=!isMuted;
   const btn=document.getElementById('muteBtn');
@@ -221,12 +221,10 @@ function toggleMute(){
   btn.classList.toggle('muted',isMuted);
   if(isMuted){speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;}
 }
-
 function toggleSession(){
   unlockTTS();if(!hasSR)return;
   isLive?stopSession():startSession();
 }
-
 function startSession(){
   isLive=true;srMode='zh';
   document.getElementById('bigBtn').classList.add('live');
@@ -242,7 +240,6 @@ function startSession(){
   if(hint)hint.remove();
   updateListenUI();beginRec();
 }
-
 function stopSession(){
   isLive=false;clearSilenceTimer();killRec();
   document.getElementById('bigBtn').classList.remove('live');
@@ -254,20 +251,16 @@ function stopSession(){
   stopRing();removeLiveEl();hidePills();fadeSubtitle();
   speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;
 }
-
 function manualSwitch(mode){
   if(!isLive||ttsBusy)return;
   clearSilenceTimer();stopRing();
   srMode=mode;updateListenUI();beginRec();
 }
-
 function updateListenUI(){
   document.getElementById('btnZh').className='listen-btn'+(srMode==='zh'?' active-a':'');
   document.getElementById('btnTgt').className='listen-btn'+(srMode==='target'?' active-b':'');
 }
-
 function clearSilenceTimer(){clearTimeout(silenceTimer);silenceTimer=null;stopRing();}
-
 function startSilenceTimer(){
   clearSilenceTimer();startRing(srMode);
   silenceTimer=setTimeout(()=>{
@@ -276,7 +269,6 @@ function startSilenceTimer(){
     updateListenUI();beginRec();
   },SILENCE_MS);
 }
-
 function killRec(){
   if(!rec)return;
   const r=rec;rec=null;
@@ -284,82 +276,73 @@ function killRec(){
   try{r.abort()}catch(e){}
 }
 
-// ── SR：language code 容錯處理 "did not match expected pattern" ───────────────
-// 部分瀏覽器對 lang 格式嚴格，先用標準格式，失敗則 fallback 到短格式
-function makeSR(lang){
-  const r=new SRClass();
-  try{
-    r.lang=lang;
-    // 觸發 getter 驗證，有些瀏覽器在設定時就拋錯
-    void r.lang;
-  }catch(e){
-    // fallback：只取語言主碼，例如 vi-VN → vi
-    try{r.lang=lang.split('-')[0];}catch(e2){}
-  }
-  return r;
-}
-
+// ── SR：continuous=false，每句結束後立刻重啟 ──────────────────────────────
+// 這是最相容的方式，避免 continuous=true + 非預設語言拋 pattern error
 function beginRec(){
   if(!isLive||ttsBusy)return;
   killRec();clearSilenceTimer();
+  gotFinal=false;
 
-  const lang=srMode==='zh'?'zh-TW':LANGS[currentLang].srCode;
-  let r;
-  try{r=makeSR(lang);}
-  catch(e){
-    // 若連建立都失敗，fallback 到 zh-TW
-    r=makeSR('zh-TW');
-  }
+  const r=new SRClass();
   rec=r;
-  r.continuous=true;
+
+  // ── 關鍵：用 BCP-47 標準格式設定語言 ──────────────────────────────────
+  const langCode=srMode==='zh'?'zh-TW':LANGS[currentLang].srCode;
+  r.lang=langCode;
+  r.continuous=false;     // ← false：每次只辨識一句，結束後 onend 觸發重啟
   r.interimResults=true;
   r.maxAlternatives=1;
 
   r.onresult=e=>{
     if(!isLive)return;
     clearSilenceTimer();
+    let interim='',final='';
     for(let i=e.resultIndex;i<e.results.length;i++){
-      const res=e.results[i];
-      const text=res[0].transcript.trim();
-      if(!text)continue;
-      const side=srMode==='zh'?'a':'b';
-      if(!res.isFinal){
-        updateLiveEl(side,text);setSubOrig(text);
-      } else {
-        removeLiveEl();
-        // detectLang 交叉驗證
-        const det=detectLang(text);
-        let actualSide=side;
-        if(det==='zh'&&srMode==='target')actualSide='a';
-        if(det==='target'&&srMode==='zh')actualSide='b';
-        const isZh=actualSide==='a';
-        const prompt=isZh?LANGS[currentLang].toTarget:LANGS[currentLang].toZh;
-        const ttsLang=isZh?LANGS[currentLang].ttsLang:'zh-TW';
-        showPill(actualSide);setSubOrig(text);
-        commitMsg(actualSide,text,prompt,ttsLang);
-        startSilenceTimer();
-      }
+      const t=e.results[i][0].transcript;
+      e.results[i].isFinal?(final+=t):(interim+=t);
+    }
+    const text=final||interim;
+    if(!text.trim())return;
+    const side=srMode==='zh'?'a':'b';
+
+    if(!final){
+      updateLiveEl(side,text.trim());
+      setSubOrig(text.trim());
+    } else {
+      gotFinal=true;
+      removeLiveEl();
+      const det=detectLang(final.trim());
+      let actualSide=side;
+      if(det==='zh'&&srMode==='target')actualSide='a';
+      if(det==='target'&&srMode==='zh')actualSide='b';
+      const isZh=actualSide==='a';
+      const prompt=isZh?LANGS[currentLang].toTarget:LANGS[currentLang].toZh;
+      const ttsLang=isZh?LANGS[currentLang].ttsLang:'zh-TW';
+      showPill(actualSide);
+      setSubOrig(final.trim());
+      commitMsg(actualSide,final.trim(),prompt,ttsLang);
+      startSilenceTimer(); // 說完開始倒數，靜默則切換語言
     }
   };
 
   r.onerror=e=>{
     if(e.error==='not-allowed'){showWarn('⚠ 麥克風權限被拒絕');stopSession();return;}
-    if(e.error==='no-speech')return;
-    // language-not-supported 或其他錯誤：fallback 到 zh-TW 繼續
-    console.warn('SR error:',e.error);
-    rec=null;
-    if(isLive&&!ttsBusy)setTimeout(beginRec,300);
+    // no-speech / audio-capture / network 等 → onend 會接手重啟
+    console.warn('SR error:',e.error,langCode);
   };
 
   r.onend=()=>{
     if(rec!==r)return;
     rec=null;
-    if(isLive&&!ttsBusy)setTimeout(beginRec,200);
+    if(!isLive||ttsBusy)return;
+    // 無論 gotFinal 是否為 true，都立刻重啟（繼續聽下一句）
+    setTimeout(beginRec,80);
   };
 
-  try{r.start();}
-  catch(e){
-    console.warn('SR start error:',e.message);
+  try{
+    r.start();
+  }catch(e){
+    console.warn('SR start failed:',e.message,langCode);
     rec=null;
     if(isLive)setTimeout(beginRec,500);
   }
@@ -402,11 +385,9 @@ function drainTTS(){
   },150);
 }
 
-// ── API：呼叫 Cloudflare Pages Function，路徑是 /translate ────────────────────
-// 注意：不是 'functions/translate'，Cloudflare 自動把 functions/ 資料夾對應到根路徑
 async function doTranslate(text,prompt){
   try{
-    const res=await fetch('/translate',{   // ← 正確路徑
+    const res=await fetch('/translate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({messages:[
