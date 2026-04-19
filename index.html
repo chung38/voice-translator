@@ -395,10 +395,22 @@ async function doTranslate(text,prompt){
         {role:'user',content:`${prompt}\n\n${text}`}
       ]})
     });
-    const data=await res.json();
-    if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);
+
+    // 先讀 text，再嘗試 parse JSON，這樣可以看到實際回傳內容
+    const raw=await res.text();
+    console.log('API raw response:',res.status,raw.slice(0,300));
+
+    if(!raw||!raw.trim()){
+      throw new Error(`HTTP ${res.status}：回傳空內容（Function 未執行？）`);
+    }
+
+    let data;
+    try{ data=JSON.parse(raw); }
+    catch(e){ throw new Error(`HTTP ${res.status}：非 JSON 回傳 → ${raw.slice(0,100)}`); }
+
+    if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
     const result=data.choices?.[0]?.message?.content?.trim();
-    if(!result)throw new Error('回傳格式錯誤');
+    if(!result) throw new Error('DeepSeek 回傳格式錯誤');
     return result;
   }catch(err){
     console.error('translate error:',err);
