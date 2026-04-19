@@ -59,18 +59,18 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .big-btn.live{background:rgba(255,80,80,.12);border-color:#f55;animation:pulse-live 1.8s ease-in-out infinite}
 @keyframes pulse-live{0%,100%{box-shadow:0 0 0 0 rgba(255,80,80,.4)}50%{box-shadow:0 0 0 14px rgba(255,80,80,0)}}
 .big-btn svg{width:32px;height:32px}
-.listen-row{display:flex;align-items:center;gap:8px;height:28px}
-.listen-btn{padding:3px 14px;border-radius:14px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:none;color:var(--text-dim);transition:all .2s;letter-spacing:.03em}
-.listen-btn.active-a{border-color:var(--a-color);color:var(--a-color);background:var(--a-bg)}
-.listen-btn.active-b{border-color:var(--b-color);color:var(--b-color);background:var(--b-bg)}
-.listen-sep{color:var(--text-dim);font-size:11px}
-.switch-ring{position:relative;width:24px;height:24px;flex-shrink:0;display:none}
-.switch-ring.show{display:block}
-.switch-ring svg{transform:rotate(-90deg)}
-.ring-bg{fill:none;stroke:var(--border);stroke-width:3}
-.ring-fg{fill:none;stroke-width:3;stroke-linecap:round}
-.ring-fg.zh{stroke:var(--a-color)}.ring-fg.tgt{stroke:var(--b-color)}
-.ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--text-mid)}
+/* 目前收聽語言指示（取代原本的切換按鈕列） */
+.mode-bar{display:none;align-items:center;justify-content:center;gap:10px;height:24px}
+.mode-pill{padding:2px 12px;border-radius:12px;font-size:11px;font-weight:500;letter-spacing:.04em;transition:all .3s}
+.mode-pill.zh{background:var(--a-bg);color:var(--a-color);border:1px solid var(--a-color)}
+.mode-pill.tgt{background:var(--b-bg);color:var(--b-color);border:1px solid var(--b-color)}
+.mode-label{font-size:11px;color:var(--text-dim)}
+/* 手動覆蓋按鈕 */
+.override-row{display:none;gap:8px;justify-content:center}
+.ov-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:4px 12px;font-size:11px;color:var(--text-dim);cursor:pointer;transition:all .2s}
+.ov-btn:hover{border-color:#555;color:var(--text-mid)}
+.ov-btn.active-a{border-color:var(--a-color);color:var(--a-color)}
+.ov-btn.active-b{border-color:var(--b-color);color:var(--b-color)}
 .bottom-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .small-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 14px;font-size:12px;color:var(--text-dim);cursor:pointer;transition:all .2s}
 .small-btn:hover{border-color:#555;color:var(--text-mid)}.small-btn.muted{border-color:#f55;color:#f55}
@@ -116,19 +116,19 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
         <rect x="9" y="9" width="14" height="14" rx="3" fill="#f55"/>
       </svg>
     </button>
-    <div class="listen-row" id="listenRow" style="display:none">
-      <button class="listen-btn" id="btnZh" onclick="manualSwitch('zh')">🇹🇼 中文</button>
-      <span class="listen-sep">⇄</span>
-      <button class="listen-btn" id="btnTgt" onclick="manualSwitch('target')">🌐 外語</button>
-      <div class="switch-ring" id="switchRing">
-        <svg viewBox="0 0 24 24" width="24" height="24">
-          <circle class="ring-bg" cx="12" cy="12" r="9"/>
-          <circle class="ring-fg" id="ringFg" cx="12" cy="12" r="9"
-            stroke-dasharray="56.5" stroke-dashoffset="56.5"/>
-        </svg>
-        <div class="ring-label" id="ringLabel"></div>
-      </div>
+
+    <!-- 目前收聽語言 + 手動覆蓋 -->
+    <div class="mode-bar" id="modeBar">
+      <span class="mode-label">正在聽</span>
+      <span class="mode-pill" id="modePill">中文</span>
+      <span class="mode-label">說話</span>
     </div>
+    <div class="override-row" id="overrideRow">
+      <button class="ov-btn" id="ovZh" onclick="manualOverride('zh')">🇹🇼 強制中文</button>
+      <button class="ov-btn" id="ovTgt" onclick="manualOverride('target')">🌐 強制外語</button>
+      <button class="ov-btn" id="ovAuto" onclick="manualOverride('auto')">🔄 自動</button>
+    </div>
+
     <div class="bottom-actions">
       <button class="small-btn" id="muteBtn" onclick="toggleMute()">🔊 翻譯朗讀</button>
       <button class="small-btn" onclick="clearChat()">清除記錄</button>
@@ -151,6 +151,7 @@ const LANGS={
       toZh:'將以下英語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'}
 };
 
+// ── 語言偵測 ──────────────────────────────────────────────────────────────────
 function detectLang(text){
   let zh=0,latin=0,thai=0,total=0;
   for(const ch of text){
@@ -170,12 +171,19 @@ const SRClass=window.SpeechRecognition||window.webkitSpeechRecognition;
 const hasSR=!!SRClass,hasTTS='speechSynthesis'in window;
 let currentLang='vi',isLive=false,isMuted=false;
 let rec=null,ttsUnlocked=false,ttsQueue=[],ttsBusy=false;
+
+// srMode：目前 SR 使用的語言
+// 'zh' | 'target'
+// overrideMode：手動鎖定模式
+// null = 自動判斷（根據上一句決定下一句）
+// 'zh' | 'target' = 強制使用某語言
 let srMode='zh';
+let overrideMode=null;
+// pendingMode：TTS 播放中時，記錄播完後要切換到的 SR 語言
+let pendingMode=null;
+
 let liveEl=null,liveElSide='a';
-let subTimer=null,pillTimer=null,silenceTimer=null;
-const SILENCE_MS=2500,CIRC=56.5;
-let ringRaf=null,ringStart=null;
-let gotFinal=false; // 這次辨識是否已拿到 final result
+let subTimer=null,pillTimer=null;
 
 if(!hasSR)showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
 if(!hasTTS)document.getElementById('muteBtn').style.display='none';
@@ -186,34 +194,52 @@ function unlockTTS(){
   const u=new SpeechSynthesisUtterance(' ');u.volume=0;u.rate=10;speechSynthesis.speak(u);
 }
 
-function startRing(mode){
-  const ring=document.getElementById('switchRing');
-  const fg=document.getElementById('ringFg');
-  const lbl=document.getElementById('ringLabel');
-  ring.classList.add('show');
-  fg.className='ring-fg '+(mode==='zh'?'zh':'tgt');
-  cancelAnimationFrame(ringRaf);ringStart=null;
-  function tick(ts){
-    if(!ringStart)ringStart=ts;
-    const pct=Math.min((ts-ringStart)/SILENCE_MS,1);
-    fg.style.strokeDashoffset=CIRC*(1-pct);
-    lbl.textContent=Math.ceil((SILENCE_MS-(ts-ringStart))/1000)||'';
-    if(pct<1)ringRaf=requestAnimationFrame(tick);
-    else ring.classList.remove('show');
-  }
-  ringRaf=requestAnimationFrame(tick);
-}
-function stopRing(){
-  cancelAnimationFrame(ringRaf);
-  document.getElementById('switchRing').classList.remove('show');
+// ── 語言邏輯 ──────────────────────────────────────────────────────────────────
+// 上一句是中文 → 下一輪用外語 SR 等回應（也可能是繼續說中文）
+// 上一句是外語 → 下一輪用中文 SR 等回應（也可能是繼續說外語）
+// 但如果下一句辨識出來的語言和 SR 語言不符，detectLang 會修正翻譯方向
+// 所以「猜錯語言」只是辨識品質差一點，不會翻錯方向
+function nextSrMode(lastDetected){
+  if(overrideMode) return overrideMode;
+  // 自動：說了中文就等外語，說了外語就等中文
+  return lastDetected==='zh' ? 'target' : 'zh';
 }
 
+function updateModeUI(){
+  const cfg=LANGS[currentLang];
+  const pill=document.getElementById('modePill');
+  if(srMode==='zh'){
+    pill.textContent='中文';
+    pill.className='mode-pill zh';
+  } else {
+    pill.textContent=cfg.label;
+    pill.className='mode-pill tgt';
+  }
+  // 手動覆蓋按鈕 highlight
+  document.getElementById('ovZh').className='ov-btn'+(overrideMode==='zh'?' active-a':'');
+  document.getElementById('ovTgt').className='ov-btn'+(overrideMode==='target'?' active-b':'');
+  document.getElementById('ovAuto').className='ov-btn'+(overrideMode===null?' active-a':'');
+}
+
+// ── UI controls ───────────────────────────────────────────────────────────────
 function setLang(el){
   if(isLive)return;
   document.querySelectorAll('.lang-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');currentLang=el.dataset.lang;
   document.getElementById('pillB').textContent=`說話者 B ${LANGS[currentLang].label}`;
 }
+
+function manualOverride(mode){
+  // mode: 'zh' | 'target' | 'auto'
+  overrideMode = mode==='auto' ? null : mode;
+  if(overrideMode){
+    srMode=overrideMode;
+    pendingMode=null;
+    if(!ttsBusy)beginRec();
+  }
+  updateModeUI();
+}
+
 function toggleMute(){
   unlockTTS();isMuted=!isMuted;
   const btn=document.getElementById('muteBtn');
@@ -221,54 +247,44 @@ function toggleMute(){
   btn.classList.toggle('muted',isMuted);
   if(isMuted){speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;}
 }
+
 function toggleSession(){
   unlockTTS();if(!hasSR)return;
   isLive?stopSession():startSession();
 }
+
 function startSession(){
-  isLive=true;srMode='zh';
+  isLive=true;srMode='zh';overrideMode=null;pendingMode=null;
   document.getElementById('bigBtn').classList.add('live');
   document.getElementById('iconMic').style.display='none';
   document.getElementById('iconStop').style.display='';
   document.getElementById('statusLabel').textContent='對話進行中…';
   document.getElementById('statusLabel').style.color='#f55';
-  document.getElementById('listenRow').style.display='flex';
+  document.getElementById('modeBar').style.display='flex';
+  document.getElementById('overrideRow').style.display='flex';
   const cfg=LANGS[currentLang];
-  document.getElementById('btnTgt').textContent=`${cfg.flag} ${cfg.label}`;
+  document.getElementById('ovTgt').textContent=`🌐 強制${cfg.label}`;
   document.getElementById('pillB').textContent=`說話者 B ${cfg.label}`;
   const hint=document.getElementById('chat').querySelector('.chat-hint');
   if(hint)hint.remove();
-  updateListenUI();beginRec();
+  updateModeUI();beginRec();
 }
+
 function stopSession(){
-  isLive=false;clearSilenceTimer();killRec();
+  isLive=false;pendingMode=null;
+  killRec();
   document.getElementById('bigBtn').classList.remove('live');
   document.getElementById('iconMic').style.display='';
   document.getElementById('iconStop').style.display='none';
   document.getElementById('statusLabel').textContent='按下開始對話';
   document.getElementById('statusLabel').style.color='';
-  document.getElementById('listenRow').style.display='none';
-  stopRing();removeLiveEl();hidePills();fadeSubtitle();
+  document.getElementById('modeBar').style.display='none';
+  document.getElementById('overrideRow').style.display='none';
+  removeLiveEl();hidePills();fadeSubtitle();
   speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;
 }
-function manualSwitch(mode){
-  if(!isLive||ttsBusy)return;
-  clearSilenceTimer();stopRing();
-  srMode=mode;updateListenUI();beginRec();
-}
-function updateListenUI(){
-  document.getElementById('btnZh').className='listen-btn'+(srMode==='zh'?' active-a':'');
-  document.getElementById('btnTgt').className='listen-btn'+(srMode==='target'?' active-b':'');
-}
-function clearSilenceTimer(){clearTimeout(silenceTimer);silenceTimer=null;stopRing();}
-function startSilenceTimer(){
-  clearSilenceTimer();startRing(srMode);
-  silenceTimer=setTimeout(()=>{
-    silenceTimer=null;stopRing();
-    srMode=srMode==='zh'?'target':'zh';
-    updateListenUI();beginRec();
-  },SILENCE_MS);
-}
+
+// ── SR ────────────────────────────────────────────────────────────────────────
 function killRec(){
   if(!rec)return;
   const r=rec;rec=null;
@@ -276,58 +292,66 @@ function killRec(){
   try{r.abort()}catch(e){}
 }
 
-// ── SR：continuous=false，每句結束後立刻重啟 ──────────────────────────────
-// 這是最相容的方式，避免 continuous=true + 非預設語言拋 pattern error
 function beginRec(){
   if(!isLive||ttsBusy)return;
-  killRec();clearSilenceTimer();
-  gotFinal=false;
+  killRec();
 
-  const r=new SRClass();
-  rec=r;
-
-  // ── 關鍵：用 BCP-47 標準格式設定語言 ──────────────────────────────────
   const langCode=srMode==='zh'?'zh-TW':LANGS[currentLang].srCode;
+  const r=new SRClass();rec=r;
   r.lang=langCode;
-  r.continuous=false;     // ← false：每次只辨識一句，結束後 onend 觸發重啟
+  r.continuous=false;
   r.interimResults=true;
   r.maxAlternatives=1;
 
   r.onresult=e=>{
     if(!isLive)return;
-    clearSilenceTimer();
     let interim='',final='';
     for(let i=e.resultIndex;i<e.results.length;i++){
       const t=e.results[i][0].transcript;
       e.results[i].isFinal?(final+=t):(interim+=t);
     }
-    const text=final||interim;
-    if(!text.trim())return;
-    const side=srMode==='zh'?'a':'b';
+    const text=(final||interim).trim();
+    if(!text)return;
 
+    // interim live bubble：用 srMode 決定顯示位置
     if(!final){
-      updateLiveEl(side,text.trim());
-      setSubOrig(text.trim());
-    } else {
-      gotFinal=true;
-      removeLiveEl();
-      const det=detectLang(final.trim());
-      let actualSide=side;
-      if(det==='zh'&&srMode==='target')actualSide='a';
-      if(det==='target'&&srMode==='zh')actualSide='b';
-      const isZh=actualSide==='a';
-      const prompt=isZh?LANGS[currentLang].toTarget:LANGS[currentLang].toZh;
-      const ttsLang=isZh?LANGS[currentLang].ttsLang:'zh-TW';
-      showPill(actualSide);
-      setSubOrig(final.trim());
-      commitMsg(actualSide,final.trim(),prompt,ttsLang);
-      startSilenceTimer(); // 說完開始倒數，靜默則切換語言
+      updateLiveEl(srMode==='zh'?'a':'b', text);
+      setSubOrig(text);
+      return;
     }
+
+    // final：用 detectLang 決定實際語言（修正辨識偏差）
+    let detected=detectLang(final);
+    // 偵測不確定時，以 srMode 為準
+    if(!detected) detected = srMode==='zh'?'zh':'target';
+
+    const side = detected==='zh'?'a':'b';
+    const isZh = side==='a';
+    const prompt   = isZh?LANGS[currentLang].toTarget:LANGS[currentLang].toZh;
+    const ttsLang  = isZh?LANGS[currentLang].ttsLang:'zh-TW';
+
+    removeLiveEl();
+    showPill(side);
+    setSubOrig(final);
+    commitMsg(side,final,prompt,ttsLang);
+
+    // ── 決定下一輪 SR 語言 ──────────────────────────────────────────────
+    // 說完後「立刻」切換，不需要等待靜默
+    // 如果 TTS 正在播放，存入 pendingMode，播完再切
+    const next=nextSrMode(detected);
+    if(next!==srMode){
+      if(ttsBusy){
+        pendingMode=next;
+      } else {
+        srMode=next;
+        updateModeUI();
+      }
+    }
+    // 如果語言不變（同一人繼續說），直接繼續同語言 SR
   };
 
   r.onerror=e=>{
     if(e.error==='not-allowed'){showWarn('⚠ 麥克風權限被拒絕');stopSession();return;}
-    // no-speech / audio-capture / network 等 → onend 會接手重啟
     console.warn('SR error:',e.error,langCode);
   };
 
@@ -335,19 +359,19 @@ function beginRec(){
     if(rec!==r)return;
     rec=null;
     if(!isLive||ttsBusy)return;
-    // 無論 gotFinal 是否為 true，都立刻重啟（繼續聽下一句）
+    // onend 後立刻重啟（使用目前的 srMode）
     setTimeout(beginRec,80);
   };
 
-  try{
-    r.start();
-  }catch(e){
-    console.warn('SR start failed:',e.message,langCode);
+  try{r.start();}
+  catch(e){
+    console.warn('SR start failed:',e.message);
     rec=null;
     if(isLive)setTimeout(beginRec,500);
   }
 }
 
+// ── commitMsg ─────────────────────────────────────────────────────────────────
 function commitMsg(side,text,prompt,ttsLang){
   const who=side==='a'?'說話者 A（中文）':`說話者 B（${LANGS[currentLang].label}）`;
   const el=document.createElement('div');
@@ -363,12 +387,26 @@ function commitMsg(side,text,prompt,ttsLang){
   });
 }
 
+// ── TTS ───────────────────────────────────────────────────────────────────────
 function enqueueTTS(text,lang,labelEl){
-  ttsQueue.push({text,lang,labelEl});if(!ttsBusy)drainTTS();
+  ttsQueue.push({text,lang,labelEl});
+  if(!ttsBusy)drainTTS();
 }
+
 function drainTTS(){
-  if(!ttsQueue.length){ttsBusy=false;if(isLive)setTimeout(beginRec,200);return;}
-  ttsBusy=true;killRec();clearSilenceTimer();
+  if(!ttsQueue.length){
+    ttsBusy=false;
+    if(!isLive)return;
+    // TTS 全部播完：套用 pendingMode（若有）
+    if(pendingMode){
+      srMode=pendingMode;pendingMode=null;
+      updateModeUI();
+    }
+    beginRec();
+    return;
+  }
+  ttsBusy=true;
+  killRec();
   const{text,lang,labelEl}=ttsQueue.shift();
   speechSynthesis.cancel();
   setTimeout(()=>{
@@ -385,6 +423,7 @@ function drainTTS(){
   },150);
 }
 
+// ── API ───────────────────────────────────────────────────────────────────────
 async function doTranslate(text,prompt){
   try{
     const res=await fetch('/translate',{
@@ -395,22 +434,13 @@ async function doTranslate(text,prompt){
         {role:'user',content:`${prompt}\n\n${text}`}
       ]})
     });
-
-    // 先讀 text，再嘗試 parse JSON，這樣可以看到實際回傳內容
     const raw=await res.text();
-    console.log('API raw response:',res.status,raw.slice(0,300));
-
-    if(!raw||!raw.trim()){
-      throw new Error(`HTTP ${res.status}：回傳空內容（Function 未執行？）`);
-    }
-
+    if(!raw||!raw.trim())throw new Error(`HTTP ${res.status}：回傳空內容`);
     let data;
-    try{ data=JSON.parse(raw); }
-    catch(e){ throw new Error(`HTTP ${res.status}：非 JSON 回傳 → ${raw.slice(0,100)}`); }
-
-    if(!res.ok) throw new Error(data.error||`HTTP ${res.status}`);
+    try{data=JSON.parse(raw);}catch(e){throw new Error(`非 JSON：${raw.slice(0,80)}`);}
+    if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);
     const result=data.choices?.[0]?.message?.content?.trim();
-    if(!result) throw new Error('DeepSeek 回傳格式錯誤');
+    if(!result)throw new Error('回傳格式錯誤');
     return result;
   }catch(err){
     console.error('translate error:',err);
@@ -418,6 +448,7 @@ async function doTranslate(text,prompt){
   }
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function updateLiveEl(side,text){
   if(!liveEl||liveElSide!==side){
     removeLiveEl();
@@ -454,7 +485,7 @@ function clearChat(){
   document.getElementById('chat').innerHTML='<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
   document.getElementById('subOrig').innerHTML='<span class="sub-dim">字幕顯示於此</span>';
   document.getElementById('subTl').textContent='';
-  speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;
+  speechSynthesis.cancel();ttsQueue=[];ttsBusy=false;pendingMode=null;
 }
 function showWarn(msg){const e=document.getElementById('warnBar');e.textContent=msg;e.style.display='block';}
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
