@@ -68,9 +68,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .switch-ring.show{display:block}
 .switch-ring svg{transform:rotate(-90deg)}
 .ring-bg{fill:none;stroke:var(--border);stroke-width:3}
-.ring-fg{fill:none;stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset .1s linear}
+.ring-fg{fill:none;stroke-width:3;stroke-linecap:round}
 .ring-fg.zh{stroke:var(--a-color)}.ring-fg.tgt{stroke:var(--b-color)}
-.ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600}
+.ring-label{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;color:var(--text-mid)}
 .bottom-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .small-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:5px 14px;font-size:12px;color:var(--text-dim);cursor:pointer;transition:all .2s}
 .small-btn:hover{border-color:#555;color:var(--text-mid)}.small-btn.muted{border-color:#f55;color:#f55}
@@ -153,10 +153,12 @@ const LANGS={
 
 function detectLang(text){
   let zh=0,latin=0,thai=0,total=0;
-  for(const ch of text){const cp=ch.codePointAt(0);if(cp<0x20)continue;total++;
+  for(const ch of text){
+    const cp=ch.codePointAt(0);if(cp<0x20)continue;total++;
     if(cp>=0x4E00&&cp<=0x9FFF)zh++;
     else if(cp>=0x0E00&&cp<=0x0E7F)thai++;
-    else if((cp>=0x41&&cp<=0x5A)||(cp>=0x61&&cp<=0x7A)||(cp>=0xC0&&cp<=0x24F))latin++;}
+    else if((cp>=0x41&&cp<=0x5A)||(cp>=0x61&&cp<=0x7A)||(cp>=0xC0&&cp<=0x24F))latin++;
+  }
   if(!total)return null;
   if(zh/total>0.25)return'zh';
   if(thai/total>0.15)return'target';
@@ -171,8 +173,7 @@ let rec=null,ttsUnlocked=false,ttsQueue=[],ttsBusy=false;
 let srMode='zh';
 let liveEl=null,liveElSide='a';
 let subTimer=null,pillTimer=null,silenceTimer=null;
-const SILENCE_MS=2500;
-const CIRC=56.5;
+const SILENCE_MS=2500,CIRC=56.5;
 let ringRaf=null,ringStart=null;
 
 if(!hasSR)showWarn('⚠ 語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
@@ -188,19 +189,23 @@ function startRing(mode){
   const ring=document.getElementById('switchRing');
   const fg=document.getElementById('ringFg');
   const lbl=document.getElementById('ringLabel');
-  ring.classList.add('show');fg.className='ring-fg '+(mode==='zh'?'zh':'tgt');
+  ring.classList.add('show');
+  fg.className='ring-fg '+(mode==='zh'?'zh':'tgt');
   cancelAnimationFrame(ringRaf);ringStart=null;
   function tick(ts){
     if(!ringStart)ringStart=ts;
     const pct=Math.min((ts-ringStart)/SILENCE_MS,1);
     fg.style.strokeDashoffset=CIRC*(1-pct);
-    const sec=Math.ceil((SILENCE_MS-(ts-ringStart))/1000);
-    lbl.textContent=sec>0?sec:'';
-    if(pct<1)ringRaf=requestAnimationFrame(tick);else ring.classList.remove('show');
+    lbl.textContent=Math.ceil((SILENCE_MS-(ts-ringStart))/1000)||'';
+    if(pct<1)ringRaf=requestAnimationFrame(tick);
+    else ring.classList.remove('show');
   }
   ringRaf=requestAnimationFrame(tick);
 }
-function stopRing(){cancelAnimationFrame(ringRaf);document.getElementById('switchRing').classList.remove('show');}
+function stopRing(){
+  cancelAnimationFrame(ringRaf);
+  document.getElementById('switchRing').classList.remove('show');
+}
 
 function setLang(el){
   if(isLive)return;
@@ -232,6 +237,7 @@ function startSession(){
   document.getElementById('listenRow').style.display='flex';
   const cfg=LANGS[currentLang];
   document.getElementById('btnTgt').textContent=`${cfg.flag} ${cfg.label}`;
+  document.getElementById('pillB').textContent=`說話者 B ${cfg.label}`;
   const hint=document.getElementById('chat').querySelector('.chat-hint');
   if(hint)hint.remove();
   updateListenUI();beginRec();
@@ -272,16 +278,42 @@ function startSilenceTimer(){
 }
 
 function killRec(){
-  if(!rec)return;const r=rec;rec=null;
-  r.onresult=r.onerror=r.onend=null;try{r.abort()}catch(e){}
+  if(!rec)return;
+  const r=rec;rec=null;
+  r.onresult=r.onerror=r.onend=null;
+  try{r.abort()}catch(e){}
+}
+
+// ── SR：language code 容錯處理 "did not match expected pattern" ───────────────
+// 部分瀏覽器對 lang 格式嚴格，先用標準格式，失敗則 fallback 到短格式
+function makeSR(lang){
+  const r=new SRClass();
+  try{
+    r.lang=lang;
+    // 觸發 getter 驗證，有些瀏覽器在設定時就拋錯
+    void r.lang;
+  }catch(e){
+    // fallback：只取語言主碼，例如 vi-VN → vi
+    try{r.lang=lang.split('-')[0];}catch(e2){}
+  }
+  return r;
 }
 
 function beginRec(){
   if(!isLive||ttsBusy)return;
   killRec();clearSilenceTimer();
+
   const lang=srMode==='zh'?'zh-TW':LANGS[currentLang].srCode;
-  const r=new SRClass();rec=r;
-  r.lang=lang;r.continuous=true;r.interimResults=true;r.maxAlternatives=1;
+  let r;
+  try{r=makeSR(lang);}
+  catch(e){
+    // 若連建立都失敗，fallback 到 zh-TW
+    r=makeSR('zh-TW');
+  }
+  rec=r;
+  r.continuous=true;
+  r.interimResults=true;
+  r.maxAlternatives=1;
 
   r.onresult=e=>{
     if(!isLive)return;
@@ -295,6 +327,7 @@ function beginRec(){
         updateLiveEl(side,text);setSubOrig(text);
       } else {
         removeLiveEl();
+        // detectLang 交叉驗證
         const det=detectLang(text);
         let actualSide=side;
         if(det==='zh'&&srMode==='target')actualSide='a';
@@ -312,10 +345,24 @@ function beginRec(){
   r.onerror=e=>{
     if(e.error==='not-allowed'){showWarn('⚠ 麥克風權限被拒絕');stopSession();return;}
     if(e.error==='no-speech')return;
-    rec=null;if(isLive&&!ttsBusy)setTimeout(beginRec,300);
+    // language-not-supported 或其他錯誤：fallback 到 zh-TW 繼續
+    console.warn('SR error:',e.error);
+    rec=null;
+    if(isLive&&!ttsBusy)setTimeout(beginRec,300);
   };
-  r.onend=()=>{if(rec!==r)return;rec=null;if(isLive&&!ttsBusy)setTimeout(beginRec,200);};
-  try{r.start();}catch(e){rec=null;if(isLive)setTimeout(beginRec,500);}
+
+  r.onend=()=>{
+    if(rec!==r)return;
+    rec=null;
+    if(isLive&&!ttsBusy)setTimeout(beginRec,200);
+  };
+
+  try{r.start();}
+  catch(e){
+    console.warn('SR start error:',e.message);
+    rec=null;
+    if(isLive)setTimeout(beginRec,500);
+  }
 }
 
 function commitMsg(side,text,prompt,ttsLang){
@@ -355,10 +402,11 @@ function drainTTS(){
   },150);
 }
 
-// ── API：只呼叫 Cloudflare Pages Function /translate ─────────────────────────
+// ── API：呼叫 Cloudflare Pages Function，路徑是 /translate ────────────────────
+// 注意：不是 'functions/translate'，Cloudflare 自動把 functions/ 資料夾對應到根路徑
 async function doTranslate(text,prompt){
   try{
-    const res=await fetch('functions/translate',{
+    const res=await fetch('/translate',{   // ← 正確路徑
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({messages:[
@@ -367,19 +415,24 @@ async function doTranslate(text,prompt){
       ]})
     });
     const data=await res.json();
-    if(!res.ok)throw new Error(data.error||'API 錯誤');
+    if(!res.ok)throw new Error(data.error||`HTTP ${res.status}`);
     const result=data.choices?.[0]?.message?.content?.trim();
     if(!result)throw new Error('回傳格式錯誤');
     return result;
-  }catch(err){return`（錯誤：${err.message}）`;}
+  }catch(err){
+    console.error('translate error:',err);
+    return`（錯誤：${err.message}）`;
+  }
 }
 
 function updateLiveEl(side,text){
   if(!liveEl||liveElSide!==side){
-    removeLiveEl();liveEl=document.createElement('div');
+    removeLiveEl();
+    liveEl=document.createElement('div');
     liveEl.className=`live-bubble ${side}`;
     liveEl.innerHTML='<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>';
-    document.getElementById('chat').appendChild(liveEl);liveElSide=side;
+    document.getElementById('chat').appendChild(liveEl);
+    liveElSide=side;
   }
   liveEl.querySelector('.live-text').textContent=text;scrollChat();
 }
