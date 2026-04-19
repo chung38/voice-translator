@@ -358,7 +358,7 @@ function drainTTS(){
 // ── API：只呼叫 Cloudflare Pages Function /translate ─────────────────────────
 async function doTranslate(text,prompt){
   try{
-    const res=await fetch('/translate',{
+    const res=await fetch('functions/translate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({messages:[
