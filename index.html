@@ -179,8 +179,23 @@ var liveElSide = 'a';
 var subTimer = null;
 var pillTimer = null;
 var voiceLoadTimer = null;
+var voicesReady = false;
 
 if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
+
+// 預先載入語音列表
+function preloadVoices() {
+  var v = speechSynthesis.getVoices();
+  if (v && v.length > 0) {
+    voicesReady = true;
+    return;
+  }
+  speechSynthesis.onvoiceschanged = function() {
+    voicesReady = true;
+    speechSynthesis.onvoiceschanged = null;
+  };
+}
+preloadVoices();
 
 function detectLangNext(detected) {
   if (overrideMode) return overrideMode;
@@ -245,6 +260,15 @@ function startSession() {
   overrideMode = null;
   pendingMode = null;
   ttsBusy = false;
+
+  // 暖機：在使用者手勢同步呼叫，解鎖 iOS / Android TTS
+  try {
+    var warm = new SpeechSynthesisUtterance('');
+    warm.volume = 0;
+    speechSynthesis.speak(warm);
+    speechSynthesis.cancel();
+  } catch(e) {}
+
   document.getElementById('bigBtn').classList.add('live');
   document.getElementById('iconMic').style.display = 'none';
   document.getElementById('iconStop').style.display = '';
@@ -278,10 +302,7 @@ function stopSession() {
   fadeSubtitle();
   stopAudio();
   ttsQueue = [];
-  if (voiceLoadTimer) {
-    clearTimeout(voiceLoadTimer);
-    voiceLoadTimer = null;
-  }
+  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
   try { speechSynthesis.cancel(); } catch(e) {}
 }
 
@@ -385,19 +406,11 @@ function commitMsg(side, text, prompt, ttsLang) {
     if (!isMuted) {
       enqueueTTS(result, ttsLang, d);
     } else {
-      if (pendingMode) {
-        srMode = pendingMode;
-        pendingMode = null;
-        updateModeUI();
-      }
+      if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
       if (isLive && !ttsBusy) beginRec();
     }
   }).catch(function() {
-    if (pendingMode) {
-      srMode = pendingMode;
-      pendingMode = null;
-      updateModeUI();
-    }
+    if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
     if (isLive && !ttsBusy) beginRec();
   });
 }
@@ -449,7 +462,7 @@ function pickVoice(lang) {
     return list[0];
   }
 
-  return best(exact) || best(prefix) || voices[0] || null;
+  return best(exact) || best(prefix) || null;
 }
 
 function getTTSParams(lang, text) {
@@ -468,16 +481,15 @@ function speakWithBrowserTTS(text, lang, done) {
   function finish() {
     if (finished) return;
     finished = true;
-    if (voiceLoadTimer) {
-      clearTimeout(voiceLoadTimer);
-      voiceLoadTimer = null;
-    }
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
     speechSynthesis.onvoiceschanged = null;
     done();
   }
 
   function speakNow() {
     try { speechSynthesis.cancel(); } catch(e) {}
+    // resume 解除 iOS/Android suspend 狀態
+    try { speechSynthesis.resume(); } catch(e) {}
 
     var utt = new SpeechSynthesisUtterance(text);
     var params = getTTSParams(lang, text);
@@ -489,50 +501,60 @@ function speakWithBrowserTTS(text, lang, done) {
     var voice = pickVoice(lang);
     if (voice) utt.voice = voice;
 
-    utt.onend = function() { setTimeout(finish, 100); };
-    utt.onerror = function() { setTimeout(finish, 100); };
+    utt.onstart = function() {
+      // 真的開始講了，清掉 fallback timer
+      if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+    };
+    utt.onend = function() { setTimeout(finish, 150); };
+    utt.onerror = function(e) {
+      console.warn('TTS error:', e.error, lang, text.slice(0, 20));
+      setTimeout(finish, 150);
+    };
 
     try {
       speechSynthesis.speak(utt);
-      var timeoutMs = Math.max(8000, Math.min(120000, text.length * 220));
-      voiceLoadTimer = setTimeout(finish, timeoutMs);
     } catch(e) {
       setTimeout(finish, 100);
+      return;
     }
+
+    // 安全逾時：每字 300ms，最少 6s，最多 90s
+    var ms = Math.max(6000, Math.min(90000, text.length * 300));
+    voiceLoadTimer = setTimeout(function() {
+      console.warn('TTS timeout, forcing next');
+      try { speechSynthesis.cancel(); } catch(e) {}
+      finish();
+    }, ms);
   }
 
+  // 若語音已就緒直接講
   var voices = speechSynthesis.getVoices();
-  if (voices && voices.length) {
+  if (voices && voices.length > 0) {
     speakNow();
     return;
   }
 
+  // 等語音包載入
   var waited = false;
   speechSynthesis.onvoiceschanged = function() {
     if (waited) return;
     waited = true;
-    if (voiceLoadTimer) {
-      clearTimeout(voiceLoadTimer);
-      voiceLoadTimer = null;
-    }
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
     speakNow();
   };
-
+  // 最多等 1.5s 就強行執行
   voiceLoadTimer = setTimeout(function() {
     if (waited) return;
     waited = true;
+    speechSynthesis.onvoiceschanged = null;
     speakNow();
-  }, 1200);
+  }, 1500);
 }
 
 function afterTTS() {
   ttsBusy = false;
   if (!isLive) return;
-  if (pendingMode) {
-    srMode = pendingMode;
-    pendingMode = null;
-    updateModeUI();
-  }
+  if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
   beginRec();
 }
 
@@ -599,10 +621,7 @@ function updateLiveEl(side, text) {
 }
 
 function removeLiveEl() {
-  if (liveEl) {
-    liveEl.remove();
-    liveEl = null;
-  }
+  if (liveEl) { liveEl.remove(); liveEl = null; }
 }
 
 function setSubOrig(text) {
@@ -649,10 +668,7 @@ function clearChat() {
   ttsQueue = [];
   ttsBusy = false;
   pendingMode = null;
-  if (voiceLoadTimer) {
-    clearTimeout(voiceLoadTimer);
-    voiceLoadTimer = null;
-  }
+  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
 }
 
 function showWarn(msg) {
