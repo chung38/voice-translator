@@ -178,7 +178,6 @@ var liveEl = null;
 var liveElSide = 'a';
 var subTimer = null;
 var pillTimer = null;
-var currentAudio = null;
 var voiceLoadTimer = null;
 
 if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
@@ -214,7 +213,11 @@ function setLang(el) {
 
 function manualOverride(mode) {
   overrideMode = (mode === 'auto') ? null : mode;
-  if (overrideMode) { srMode = overrideMode; pendingMode = null; if (!ttsBusy) beginRec(); }
+  if (overrideMode) {
+    srMode = overrideMode;
+    pendingMode = null;
+    if (!ttsBusy) beginRec();
+  }
   updateModeUI();
 }
 
@@ -223,16 +226,25 @@ function toggleMute() {
   var btn = document.getElementById('muteBtn');
   btn.textContent = isMuted ? '🔇 翻譯已靜音' : '🔊 翻譯朗讀';
   btn.classList.toggle('muted', isMuted);
-  if (isMuted) { stopAudio(); ttsQueue = []; ttsBusy = false; }
+  if (isMuted) {
+    stopAudio();
+    ttsQueue = [];
+    ttsBusy = false;
+  }
 }
 
 function toggleSession() {
   if (!hasSR) return;
-  if (isLive) stopSession(); else startSession();
+  if (isLive) stopSession();
+  else startSession();
 }
 
 function startSession() {
-  isLive = true; srMode = 'zh'; overrideMode = null; pendingMode = null; ttsBusy = false;
+  isLive = true;
+  srMode = 'zh';
+  overrideMode = null;
+  pendingMode = null;
+  ttsBusy = false;
   document.getElementById('bigBtn').classList.add('live');
   document.getElementById('iconMic').style.display = 'none';
   document.getElementById('iconStop').style.display = '';
@@ -250,7 +262,9 @@ function startSession() {
 }
 
 function stopSession() {
-  isLive = false; pendingMode = null; ttsBusy = false;
+  isLive = false;
+  pendingMode = null;
+  ttsBusy = false;
   killRec();
   document.getElementById('bigBtn').classList.remove('live');
   document.getElementById('iconMic').style.display = '';
@@ -259,16 +273,25 @@ function stopSession() {
   document.getElementById('statusLabel').style.color = '';
   document.getElementById('modeBar').style.display = 'none';
   document.getElementById('overrideRow').style.display = 'none';
-  removeLiveEl(); hidePills(); fadeSubtitle();
-  stopAudio(); ttsQueue = [];
-  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+  removeLiveEl();
+  hidePills();
+  fadeSubtitle();
+  stopAudio();
+  ttsQueue = [];
+  if (voiceLoadTimer) {
+    clearTimeout(voiceLoadTimer);
+    voiceLoadTimer = null;
+  }
   try { speechSynthesis.cancel(); } catch(e) {}
 }
 
 function killRec() {
   if (!rec) return;
-  var r = rec; rec = null;
-  r.onresult = null; r.onerror = null; r.onend = null;
+  var r = rec;
+  rec = null;
+  r.onresult = null;
+  r.onerror = null;
+  r.onend = null;
   try { r.abort(); } catch(e) {}
 }
 
@@ -288,7 +311,8 @@ function beginRec() {
     var interim = '', fin = '';
     for (var i = e.resultIndex; i < e.results.length; i++) {
       var t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) fin += t; else interim += t;
+      if (e.results[i].isFinal) fin += t;
+      else interim += t;
     }
     var text = (fin || interim).trim();
     if (!text) return;
@@ -310,12 +334,19 @@ function beginRec() {
     var next = detectLangNext(detected);
     if (next !== srMode) {
       if (ttsBusy) pendingMode = next;
-      else { srMode = next; updateModeUI(); }
+      else {
+        srMode = next;
+        updateModeUI();
+      }
     }
   };
 
   r.onerror = function(e) {
-    if (e.error === 'not-allowed') { showWarn('麥克風權限被拒絕'); stopSession(); return; }
+    if (e.error === 'not-allowed') {
+      showWarn('麥克風權限被拒絕');
+      stopSession();
+      return;
+    }
     console.warn('SR error:', e.error);
   };
 
@@ -326,7 +357,12 @@ function beginRec() {
     setTimeout(beginRec, 80);
   };
 
-  try { r.start(); } catch(e) { rec = null; if (isLive) setTimeout(beginRec, 500); }
+  try {
+    r.start();
+  } catch(e) {
+    rec = null;
+    if (isLive) setTimeout(beginRec, 500);
+  }
 }
 
 function commitMsg(side, text, prompt, ttsLang) {
@@ -349,43 +385,25 @@ function commitMsg(side, text, prompt, ttsLang) {
     if (!isMuted) {
       enqueueTTS(result, ttsLang, d);
     } else {
-      if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
+      if (pendingMode) {
+        srMode = pendingMode;
+        pendingMode = null;
+        updateModeUI();
+      }
       if (isLive && !ttsBusy) beginRec();
     }
   }).catch(function() {
-    if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
+    if (pendingMode) {
+      srMode = pendingMode;
+      pendingMode = null;
+      updateModeUI();
+    }
     if (isLive && !ttsBusy) beginRec();
   });
 }
 
 function stopAudio() {
-  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
   try { speechSynthesis.cancel(); } catch(e) {}
-}
-
-function fetchTTS(text, lang) {
-  return fetch('/tts', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({text: text, lang: lang})
-  }).then(function(res) {
-    return res.text().then(function(raw) {
-      if (!raw || !raw.trim()) throw new Error('TTS HTTP ' + res.status + ' 空回應');
-      var data = JSON.parse(raw);
-      if (!res.ok) throw new Error(data.error || 'TTS HTTP ' + res.status);
-      if (!data.audioContent) throw new Error('TTS 無 audioContent');
-      return data.audioContent;
-    });
-  });
-}
-
-function playBase64MP3(base64, onEnd) {
-  stopAudio();
-  var audio = new Audio('data:audio/mp3;base64,' + base64);
-  currentAudio = audio;
-  audio.onended = function() { currentAudio = null; onEnd(); };
-  audio.onerror = function() { currentAudio = null; onEnd(); };
-  audio.play().catch(function() { currentAudio = null; onEnd(); });
 }
 
 function enqueueTTS(text, lang, labelEl) {
@@ -399,40 +417,49 @@ function pickVoice(lang) {
 
   var exact = [];
   var prefix = [];
-  var prefNames = ['Google', 'Premium', 'Natural', 'Microsoft', 'WaveNet'];
-
+  var preferred = ['Google', 'Premium', 'Natural', 'Microsoft', 'WaveNet'];
   var prefixCode = lang.split('-')[0];
 
   for (var i = 0; i < voices.length; i++) {
     var v = voices[i];
     if (!v.lang) continue;
-    if (v.lang === lang) {
-      exact.push(v);
-    } else if (v.lang.indexOf(prefixCode) === 0) {
-      prefix.push(v);
-    }
+    if (v.lang === lang) exact.push(v);
+    else if (v.lang.indexOf(prefixCode) === 0) prefix.push(v);
   }
 
-  function pickBest(list) {
-    if (!list.length) return null;
-    // 優先選名字裡有高品質關鍵字的 voice
-    for (var i = 0; i < list.length; i++) {
-      var name = list[i].name || '';
-      for (var j = 0; j < prefNames.length; j++) {
-        if (name.indexOf(prefNames[j]) !== -1) {
-          return list[i];
-        }
-      }
+  function score(v) {
+    var s = 0;
+    var name = (v.name || '').toLowerCase();
+    var fullLang = (v.lang || '').toLowerCase();
+    if (fullLang === lang.toLowerCase()) s += 100;
+    if (fullLang.indexOf(prefixCode.toLowerCase()) === 0) s += 30;
+    if (v.localService === false) s += 10;
+    if (v.default) s += 8;
+    for (var j = 0; j < preferred.length; j++) {
+      if (name.indexOf(preferred[j].toLowerCase()) !== -1) s += 20;
     }
-    // 沒有特別好的，就用第一個
+    if (name.indexOf('online') !== -1) s += 5;
+    if (name.indexOf('enhanced') !== -1) s += 5;
+    return s;
+  }
+
+  function best(list) {
+    if (!list.length) return null;
+    list.sort(function(a, b) { return score(b) - score(a); });
     return list[0];
   }
 
-  var v = pickBest(exact);
-  if (!v) v = pickBest(prefix);
-  if (!v && voices.length) v = voices[0];
+  return best(exact) || best(prefix) || voices[0] || null;
+}
 
-  return v || null;
+function getTTSParams(lang, text) {
+  var len = (text || '').length;
+  if (lang === 'zh-TW') return { rate: 0.95, pitch: 1.0 };
+  if (lang === 'en-US') return { rate: len > 120 ? 0.9 : 0.94, pitch: 1.0 };
+  if (lang === 'th-TH') return { rate: 0.9, pitch: 1.0 };
+  if (lang === 'vi-VN') return { rate: 0.92, pitch: 1.0 };
+  if (lang === 'id-ID') return { rate: 0.93, pitch: 1.0 };
+  return { rate: 0.92, pitch: 1.0 };
 }
 
 function speakWithBrowserTTS(text, lang, done) {
@@ -441,7 +468,10 @@ function speakWithBrowserTTS(text, lang, done) {
   function finish() {
     if (finished) return;
     finished = true;
-    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+    if (voiceLoadTimer) {
+      clearTimeout(voiceLoadTimer);
+      voiceLoadTimer = null;
+    }
     speechSynthesis.onvoiceschanged = null;
     done();
   }
@@ -450,15 +480,10 @@ function speakWithBrowserTTS(text, lang, done) {
     try { speechSynthesis.cancel(); } catch(e) {}
 
     var utt = new SpeechSynthesisUtterance(text);
+    var params = getTTSParams(lang, text);
     utt.lang = lang;
-
-    // 依語言微調語速，讓可懂度比較好
-    if (lang === 'zh-TW') {
-      utt.rate = 0.95;
-    } else {
-      utt.rate = 0.9;
-    }
-    utt.pitch = 1.0;
+    utt.rate = params.rate;
+    utt.pitch = params.pitch;
     utt.volume = 1.0;
 
     var voice = pickVoice(lang);
@@ -469,8 +494,8 @@ function speakWithBrowserTTS(text, lang, done) {
 
     try {
       speechSynthesis.speak(utt);
-      // 防卡死保險
-      voiceLoadTimer = setTimeout(finish, 120000); // 最多播 120 秒
+      var timeoutMs = Math.max(8000, Math.min(120000, text.length * 220));
+      voiceLoadTimer = setTimeout(finish, timeoutMs);
     } catch(e) {
       setTimeout(finish, 100);
     }
@@ -486,47 +511,13 @@ function speakWithBrowserTTS(text, lang, done) {
   speechSynthesis.onvoiceschanged = function() {
     if (waited) return;
     waited = true;
-    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
-    speakNow();
-  };
-
-  voiceLoadTimer = setTimeout(function() {
-    if (waited) return;
-    waited = true;
-    speakNow();
-  }, 1200);
-}
-
-  function speakNow() {
-    try { speechSynthesis.cancel(); } catch(e) {}
-    var utt = new SpeechSynthesisUtterance(text);
-    utt.lang = lang;
-    utt.rate = 0.92;
-    var voice = pickVoice(lang);
-    if (voice) utt.voice = voice;
-    utt.onend = function() { setTimeout(finish, 100); };
-    utt.onerror = function() { setTimeout(finish, 100); };
-    try {
-      speechSynthesis.speak(utt);
-      voiceLoadTimer = setTimeout(finish, 5000);
-    } catch(e) {
-      setTimeout(finish, 100);
+    if (voiceLoadTimer) {
+      clearTimeout(voiceLoadTimer);
+      voiceLoadTimer = null;
     }
-  }
-
-  var voices = speechSynthesis.getVoices();
-  if (voices && voices.length) {
-    speakNow();
-    return;
-  }
-
-  var waited = false;
-  speechSynthesis.onvoiceschanged = function() {
-    if (waited) return;
-    waited = true;
-    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
     speakNow();
   };
+
   voiceLoadTimer = setTimeout(function() {
     if (waited) return;
     waited = true;
@@ -537,7 +528,11 @@ function speakWithBrowserTTS(text, lang, done) {
 function afterTTS() {
   ttsBusy = false;
   if (!isLive) return;
-  if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
+  if (pendingMode) {
+    srMode = pendingMode;
+    pendingMode = null;
+    updateModeUI();
+  }
   beginRec();
 }
 
@@ -548,29 +543,25 @@ function drainTTS() {
   }
 
   ttsBusy = true;
-  killRec(); // 播放時先停掉辨識，避免干擾
+  killRec();
 
   var item = ttsQueue.shift();
   var text = item.text;
   var lang = item.lang;
   var labelEl = item.labelEl;
-
   if (labelEl) labelEl.classList.add('speaking');
 
   function onTTSDone() {
     if (labelEl) labelEl.classList.remove('speaking');
-    if (ttsQueue.length > 0) {
-      drainTTS();
-    } else {
-      afterTTS();
-    }
+    if (ttsQueue.length > 0) drainTTS();
+    else afterTTS();
   }
 
-  // 直接使用瀏覽器 TTS，不再呼叫後端 /tts
   speakWithBrowserTTS(text, lang, function() {
     setTimeout(onTTSDone, 100);
   });
 }
+
 function doTranslate(text, prompt) {
   return fetch('/translate', {
     method: 'POST',
@@ -606,19 +597,32 @@ function updateLiveEl(side, text) {
   liveEl.querySelector('.live-text').textContent = text;
   scrollChat();
 }
-function removeLiveEl() { if (liveEl) { liveEl.remove(); liveEl = null; } }
-function setSubOrig(text) { clearTimeout(subTimer); document.getElementById('subOrig').textContent = text; }
+
+function removeLiveEl() {
+  if (liveEl) {
+    liveEl.remove();
+    liveEl = null;
+  }
+}
+
+function setSubOrig(text) {
+  clearTimeout(subTimer);
+  document.getElementById('subOrig').textContent = text;
+}
+
 function setSubTl(text, side) {
   var el = document.getElementById('subTl');
   el.textContent = text;
-  el.style.color = side==='a' ? 'rgba(77,182,255,.9)' : side==='b' ? 'rgba(255,112,67,.9)' : 'rgba(255,255,255,.5)';
+  el.style.color = side === 'a' ? 'rgba(77,182,255,.9)' : side === 'b' ? 'rgba(255,112,67,.9)' : 'rgba(255,255,255,.5)';
 }
+
 function fadeSubtitle() {
   subTimer = setTimeout(function() {
     document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
     document.getElementById('subTl').textContent = '';
   }, 5000);
 }
+
 function showPill(side) {
   clearTimeout(pillTimer);
   document.getElementById('pillA').classList.remove('show');
@@ -626,20 +630,40 @@ function showPill(side) {
   document.getElementById('pill' + side.toUpperCase()).classList.add('show');
   pillTimer = setTimeout(hidePills, 3000);
 }
+
 function hidePills() {
   document.getElementById('pillA').classList.remove('show');
   document.getElementById('pillB').classList.remove('show');
 }
-function scrollChat() { var c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
+
+function scrollChat() {
+  var c = document.getElementById('chat');
+  c.scrollTop = c.scrollHeight;
+}
+
 function clearChat() {
   document.getElementById('chat').innerHTML = '<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
   document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
   document.getElementById('subTl').textContent = '';
-  stopAudio(); ttsQueue = []; ttsBusy = false; pendingMode = null;
-  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+  stopAudio();
+  ttsQueue = [];
+  ttsBusy = false;
+  pendingMode = null;
+  if (voiceLoadTimer) {
+    clearTimeout(voiceLoadTimer);
+    voiceLoadTimer = null;
+  }
 }
-function showWarn(msg) { var e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showWarn(msg) {
+  var e = document.getElementById('warnBar');
+  e.textContent = msg;
+  e.style.display = 'block';
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 </script>
 </body>
 </html>
