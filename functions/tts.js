@@ -1,23 +1,9 @@
-// functions/tts.js
-// 呼叫 Google Cloud Text-to-Speech API
-// 環境變數：GOOGLE_TTS_KEY
-
+export async function onRequestPost(context) {
 const HEADERS = {
 ‘Content-Type’: ‘application/json’,
 ‘Access-Control-Allow-Origin’: ‘*’,
 };
 
-// 每種語言對應的 WaveNet 聲音（自然度最高）
-// WaveNet 聲音名稱格式：{lang}-Wavenet-{ID}
-const VOICE_MAP = {
-‘zh-TW’: { languageCode: ‘cmn-TW’, name: ‘cmn-TW-Wavenet-A’, gender: ‘FEMALE’ },
-‘vi-VN’: { languageCode: ‘vi-VN’, name: ‘vi-VN-Wavenet-A’, gender: ‘FEMALE’ },
-‘th-TH’: { languageCode: ‘th-TH’, name: ‘th-TH-Neural2-C’, gender: ‘FEMALE’ },
-‘id-ID’: { languageCode: ‘id-ID’, name: ‘id-ID-Wavenet-A’, gender: ‘FEMALE’ },
-‘en-US’: { languageCode: ‘en-US’, name: ‘en-US-Wavenet-F’, gender: ‘FEMALE’ },
-};
-
-export async function onRequestPost(context) {
 try {
 const KEY = context.env.GOOGLE_TTS_KEY;
 if (!KEY) {
@@ -28,7 +14,10 @@ JSON.stringify({ error: ‘Missing GOOGLE_TTS_KEY’ }),
 }
 
 ```
-const { text, lang } = await context.request.json();
+const body = await context.request.json();
+const text = body.text;
+const lang = body.lang;
+
 if (!text || !lang) {
   return new Response(
     JSON.stringify({ error: 'Missing text or lang' }),
@@ -36,29 +25,36 @@ if (!text || !lang) {
   );
 }
 
-const voice = VOICE_MAP[lang] || VOICE_MAP['zh-TW'];
+const voiceMap = {
+  'zh-TW': { languageCode: 'cmn-TW', name: 'cmn-TW-Wavenet-A' },
+  'vi-VN': { languageCode: 'vi-VN',  name: 'vi-VN-Wavenet-A'  },
+  'th-TH': { languageCode: 'th-TH',  name: 'th-TH-Neural2-C'  },
+  'id-ID': { languageCode: 'id-ID',  name: 'id-ID-Wavenet-A'  },
+  'en-US': { languageCode: 'en-US',  name: 'en-US-Wavenet-F'  },
+};
 
-const body = {
-  input: { text },
+const voice = voiceMap[lang] || voiceMap['zh-TW'];
+
+const reqBody = {
+  input: { text: text },
   voice: {
     languageCode: voice.languageCode,
     name: voice.name,
-    ssmlGender: voice.gender,
+    ssmlGender: 'FEMALE',
   },
   audioConfig: {
     audioEncoding: 'MP3',
-    speakingRate: 1.0,   // 語速，1.0 = 正常，可調 0.75–1.25
-    pitch: 0,             // 音調，0 = 正常
-    volumeGainDb: 0,
+    speakingRate: 1.0,
+    pitch: 0,
   },
 };
 
 const res = await fetch(
-  `https://texttospeech.googleapis.com/v1/text:synthesize?key=${KEY}`,
+  'https://texttospeech.googleapis.com/v1/text:synthesize?key=' + KEY,
   {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(reqBody),
   }
 );
 
@@ -66,12 +62,11 @@ const data = await res.json();
 
 if (!res.ok) {
   return new Response(
-    JSON.stringify({ error: data.error?.message || 'Google TTS error' }),
+    JSON.stringify({ error: data.error ? data.error.message : 'Google TTS error' }),
     { status: res.status, headers: HEADERS }
   );
 }
 
-// 回傳 base64 編碼的 MP3
 return new Response(
   JSON.stringify({ audioContent: data.audioContent }),
   { status: 200, headers: HEADERS }
