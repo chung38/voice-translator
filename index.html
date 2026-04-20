@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
@@ -148,341 +147,340 @@ var LANGS = {
 };
 
 function detectLang(text) {
-var zh=0, latin=0, thai=0, total=0;
-for (var i=0; i<text.length; i++) {
-var cp = text.codePointAt(i);
-if (cp < 0x20) continue;
-total++;
-if (cp >= 0x4E00 && cp <= 0x9FFF) zh++;
-else if (cp >= 0x0E00 && cp <= 0x0E7F) thai++;
-else if ((cp>=0x41&&cp<=0x5A)||(cp>=0x61&&cp<=0x7A)||(cp>=0xC0&&cp<=0x24F)) latin++;
-}
-if (!total) return null;
-if (zh/total > 0.25) return ‘zh’;
-if (thai/total > 0.15) return ‘target’;
-if (latin/total > 0.4) return ‘target’;
-return null;
+  var zh=0, latin=0, thai=0, total=0;
+  for (var i=0; i<text.length; i++) {
+    var cp = text.codePointAt(i);
+    if (cp < 0x20) continue;
+    total++;
+    if (cp >= 0x4E00 && cp <= 0x9FFF) zh++;
+    else if (cp >= 0x0E00 && cp <= 0x0E7F) thai++;
+    else if ((cp>=0x41&&cp<=0x5A)||(cp>=0x61&&cp<=0x7A)||(cp>=0xC0&&cp<=0x24F)) latin++;
+  }
+  if (!total) return null;
+  if (zh/total > 0.25) return 'zh';
+  if (thai/total > 0.15) return 'target';
+  if (latin/total > 0.4) return 'target';
+  return null;
 }
 
 var SRClass = window.SpeechRecognition || window.webkitSpeechRecognition;
 var hasSR = !!SRClass;
-var currentLang = ‘vi’;
+var currentLang = 'vi';
 var isLive = false;
 var isMuted = false;
 var rec = null;
 var ttsQueue = [];
 var ttsBusy = false;
-var srMode = ‘zh’;
+var srMode = 'zh';
 var overrideMode = null;
 var pendingMode = null;
 var liveEl = null;
-var liveElSide = ‘a’;
+var liveElSide = 'a';
 var subTimer = null;
 var pillTimer = null;
 var currentAudio = null;
 
-if (!hasSR) showWarn(‘語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行’);
+if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
 
 function detectLangNext(detected) {
-if (overrideMode) return overrideMode;
-return detected === ‘zh’ ? ‘target’ : ‘zh’;
+  if (overrideMode) return overrideMode;
+  return detected === 'zh' ? 'target' : 'zh';
 }
 
 function updateModeUI() {
-var cfg = LANGS[currentLang];
-var pill = document.getElementById(‘modePill’);
-if (srMode === ‘zh’) {
-pill.textContent = ‘中文’;
-pill.className = ‘mode-pill zh’;
-} else {
-pill.textContent = cfg.label;
-pill.className = ‘mode-pill tgt’;
-}
-document.getElementById(‘ovZh’).className = ‘ov-btn’ + (overrideMode === ‘zh’ ? ’ active-a’ : ‘’);
-document.getElementById(‘ovTgt’).className = ‘ov-btn’ + (overrideMode === ‘target’ ? ’ active-b’ : ‘’);
-document.getElementById(‘ovAuto’).className = ‘ov-btn’ + (overrideMode === null ? ’ active-a’ : ‘’);
+  var cfg = LANGS[currentLang];
+  var pill = document.getElementById('modePill');
+  if (srMode === 'zh') {
+    pill.textContent = '中文';
+    pill.className = 'mode-pill zh';
+  } else {
+    pill.textContent = cfg.label;
+    pill.className = 'mode-pill tgt';
+  }
+  document.getElementById('ovZh').className = 'ov-btn' + (overrideMode === 'zh' ? ' active-a' : '');
+  document.getElementById('ovTgt').className = 'ov-btn' + (overrideMode === 'target' ? ' active-b' : '');
+  document.getElementById('ovAuto').className = 'ov-btn' + (overrideMode === null ? ' active-a' : '');
 }
 
 function setLang(el) {
-if (isLive) return;
-var tabs = document.querySelectorAll(’.lang-tab’);
-for (var i=0; i<tabs.length; i++) tabs[i].classList.remove(‘active’);
-el.classList.add(‘active’);
-currentLang = el.dataset.lang;
-document.getElementById(‘pillB’).textContent = ’說話者 B ’ + LANGS[currentLang].label;
+  if (isLive) return;
+  var tabs = document.querySelectorAll('.lang-tab');
+  for (var i=0; i<tabs.length; i++) tabs[i].classList.remove('active');
+  el.classList.add('active');
+  currentLang = el.dataset.lang;
+  document.getElementById('pillB').textContent = '說話者 B ' + LANGS[currentLang].label;
 }
 
 function manualOverride(mode) {
-overrideMode = (mode === ‘auto’) ? null : mode;
-if (overrideMode) { srMode = overrideMode; pendingMode = null; if (!ttsBusy) beginRec(); }
-updateModeUI();
+  overrideMode = (mode === 'auto') ? null : mode;
+  if (overrideMode) { srMode = overrideMode; pendingMode = null; if (!ttsBusy) beginRec(); }
+  updateModeUI();
 }
 
 function toggleMute() {
-isMuted = !isMuted;
-var btn = document.getElementById(‘muteBtn’);
-btn.textContent = isMuted ? ‘🔇 翻譯已靜音’ : ‘🔊 翻譯朗讀’;
-btn.classList.toggle(‘muted’, isMuted);
-if (isMuted) { stopAudio(); ttsQueue = []; ttsBusy = false; }
+  isMuted = !isMuted;
+  var btn = document.getElementById('muteBtn');
+  btn.textContent = isMuted ? '🔇 翻譯已靜音' : '🔊 翻譯朗讀';
+  btn.classList.toggle('muted', isMuted);
+  if (isMuted) { stopAudio(); ttsQueue = []; ttsBusy = false; }
 }
 
 function toggleSession() {
-if (!hasSR) return;
-if (isLive) stopSession(); else startSession();
+  if (!hasSR) return;
+  if (isLive) stopSession(); else startSession();
 }
 
 function startSession() {
-isLive = true; srMode = ‘zh’; overrideMode = null; pendingMode = null;
-document.getElementById(‘bigBtn’).classList.add(‘live’);
-document.getElementById(‘iconMic’).style.display = ‘none’;
-document.getElementById(‘iconStop’).style.display = ‘’;
-document.getElementById(‘statusLabel’).textContent = ‘對話進行中…’;
-document.getElementById(‘statusLabel’).style.color = ‘#f55’;
-document.getElementById(‘modeBar’).style.display = ‘flex’;
-document.getElementById(‘overrideRow’).style.display = ‘flex’;
-var cfg = LANGS[currentLang];
-document.getElementById(‘ovTgt’).textContent = ‘強制’ + cfg.label;
-document.getElementById(‘pillB’).textContent = ‘說話者 B ’ + cfg.label;
-var hint = document.getElementById(‘chat’).querySelector(’.chat-hint’);
-if (hint) hint.remove();
-updateModeUI();
-beginRec();
+  isLive = true; srMode = 'zh'; overrideMode = null; pendingMode = null;
+  document.getElementById('bigBtn').classList.add('live');
+  document.getElementById('iconMic').style.display = 'none';
+  document.getElementById('iconStop').style.display = '';
+  document.getElementById('statusLabel').textContent = '對話進行中…';
+  document.getElementById('statusLabel').style.color = '#f55';
+  document.getElementById('modeBar').style.display = 'flex';
+  document.getElementById('overrideRow').style.display = 'flex';
+  var cfg = LANGS[currentLang];
+  document.getElementById('ovTgt').textContent = '強制' + cfg.label;
+  document.getElementById('pillB').textContent = '說話者 B ' + cfg.label;
+  var hint = document.getElementById('chat').querySelector('.chat-hint');
+  if (hint) hint.remove();
+  updateModeUI();
+  beginRec();
 }
 
 function stopSession() {
-isLive = false; pendingMode = null; killRec();
-document.getElementById(‘bigBtn’).classList.remove(‘live’);
-document.getElementById(‘iconMic’).style.display = ‘’;
-document.getElementById(‘iconStop’).style.display = ‘none’;
-document.getElementById(‘statusLabel’).textContent = ‘按下開始對話’;
-document.getElementById(‘statusLabel’).style.color = ‘’;
-document.getElementById(‘modeBar’).style.display = ‘none’;
-document.getElementById(‘overrideRow’).style.display = ‘none’;
-removeLiveEl(); hidePills(); fadeSubtitle();
-stopAudio(); ttsQueue = []; ttsBusy = false;
+  isLive = false; pendingMode = null; killRec();
+  document.getElementById('bigBtn').classList.remove('live');
+  document.getElementById('iconMic').style.display = '';
+  document.getElementById('iconStop').style.display = 'none';
+  document.getElementById('statusLabel').textContent = '按下開始對話';
+  document.getElementById('statusLabel').style.color = '';
+  document.getElementById('modeBar').style.display = 'none';
+  document.getElementById('overrideRow').style.display = 'none';
+  removeLiveEl(); hidePills(); fadeSubtitle();
+  stopAudio(); ttsQueue = []; ttsBusy = false;
 }
 
 function killRec() {
-if (!rec) return;
-var r = rec; rec = null;
-r.onresult = null; r.onerror = null; r.onend = null;
-try { r.abort(); } catch(e) {}
+  if (!rec) return;
+  var r = rec; rec = null;
+  r.onresult = null; r.onerror = null; r.onend = null;
+  try { r.abort(); } catch(e) {}
 }
 
 function beginRec() {
-if (!isLive || ttsBusy) return;
-killRec();
-var langCode = (srMode === ‘zh’) ? ‘zh-TW’ : LANGS[currentLang].srCode;
-var r = new SRClass();
-rec = r;
-r.lang = langCode;
-r.continuous = false;
-r.interimResults = true;
-r.maxAlternatives = 1;
+  if (!isLive || ttsBusy) return;
+  killRec();
+  var langCode = (srMode === 'zh') ? 'zh-TW' : LANGS[currentLang].srCode;
+  var r = new SRClass();
+  rec = r;
+  r.lang = langCode;
+  r.continuous = false;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
 
-r.onresult = function(e) {
-if (!isLive) return;
-var interim = ‘’, final = ‘’;
-for (var i = e.resultIndex; i < e.results.length; i++) {
-var t = e.results[i][0].transcript;
-if (e.results[i].isFinal) final += t; else interim += t;
-}
-var text = (final || interim).trim();
-if (!text) return;
-if (!final) {
-updateLiveEl(srMode === ‘zh’ ? ‘a’ : ‘b’, text);
-setSubOrig(text);
-return;
-}
-var detected = detectLang(final);
-if (!detected) detected = (srMode === ‘zh’) ? ‘zh’ : ‘target’;
-var side = (detected === ‘zh’) ? ‘a’ : ‘b’;
-var isZh = (side === ‘a’);
-var prompt = isZh ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
-var ttsLang = isZh ? LANGS[currentLang].ttsLang : ‘zh-TW’;
-removeLiveEl();
-showPill(side);
-setSubOrig(final);
-commitMsg(side, final, prompt, ttsLang);
-var next = detectLangNext(detected);
-if (next !== srMode) {
-if (ttsBusy) pendingMode = next;
-else { srMode = next; updateModeUI(); }
-}
-};
+  r.onresult = function(e) {
+    if (!isLive) return;
+    var interim = '', final = '';
+    for (var i = e.resultIndex; i < e.results.length; i++) {
+      var t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) final += t; else interim += t;
+    }
+    var text = (final || interim).trim();
+    if (!text) return;
+    if (!final) {
+      updateLiveEl(srMode === 'zh' ? 'a' : 'b', text);
+      setSubOrig(text);
+      return;
+    }
+    var detected = detectLang(final);
+    if (!detected) detected = (srMode === 'zh') ? 'zh' : 'target';
+    var side = (detected === 'zh') ? 'a' : 'b';
+    var isZh = (side === 'a');
+    var prompt = isZh ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
+    var ttsLang = isZh ? LANGS[currentLang].ttsLang : 'zh-TW';
+    removeLiveEl();
+    showPill(side);
+    setSubOrig(final);
+    commitMsg(side, final, prompt, ttsLang);
+    var next = detectLangNext(detected);
+    if (next !== srMode) {
+      if (ttsBusy) pendingMode = next;
+      else { srMode = next; updateModeUI(); }
+    }
+  };
 
-r.onerror = function(e) {
-if (e.error === ‘not-allowed’) { showWarn(‘麥克風權限被拒絕’); stopSession(); return; }
-console.warn(‘SR error:’, e.error);
-};
+  r.onerror = function(e) {
+    if (e.error === 'not-allowed') { showWarn('麥克風權限被拒絕'); stopSession(); return; }
+    console.warn('SR error:', e.error);
+  };
 
-r.onend = function() {
-if (rec !== r) return;
-rec = null;
-if (!isLive || ttsBusy) return;
-setTimeout(beginRec, 80);
-};
+  r.onend = function() {
+    if (rec !== r) return;
+    rec = null;
+    if (!isLive || ttsBusy) return;
+    setTimeout(beginRec, 80);
+  };
 
-try { r.start(); } catch(e) { rec = null; if (isLive) setTimeout(beginRec, 500); }
+  try { r.start(); } catch(e) { rec = null; if (isLive) setTimeout(beginRec, 500); }
 }
 
 function commitMsg(side, text, prompt, ttsLang) {
-var who = (side === ‘a’) ? ‘說話者 A（中文）’ : (‘說話者 B（’ + LANGS[currentLang].label + ‘）’);
-var el = document.createElement(‘div’);
-el.className = ‘msg ’ + side;
-el.innerHTML = ‘<div class="msg-who">’ + who + ‘</div><div class="msg-bubble"><div class="msg-orig">’ + esc(text) + ‘</div><div class="msg-div"></div><div class="msg-tling"><div class="dots"><span></span><span></span><span></span></div><span>翻譯中</span></div></div>’;
-document.getElementById(‘chat’).appendChild(el);
-scrollChat();
-setSubTl(’…’, side);
-doTranslate(text, prompt).then(function(result) {
-var tling = el.querySelector(’.msg-tling’);
-if (!tling) return;
-var d = document.createElement(‘div’);
-d.className = ‘msg-tl’;
-d.textContent = result;
-tling.replaceWith(d);
-setSubTl(result, side);
-scrollChat();
-if (!isMuted) enqueueTTS(result, ttsLang, d);
-});
+  var who = (side === 'a') ? '說話者 A（中文）' : ('說話者 B（' + LANGS[currentLang].label + '）');
+  var el = document.createElement('div');
+  el.className = 'msg ' + side;
+  el.innerHTML = '<div class="msg-who">' + who + '</div><div class="msg-bubble"><div class="msg-orig">' + esc(text) + '</div><div class="msg-div"></div><div class="msg-tling"><div class="dots"><span></span><span></span><span></span></div><span>翻譯中</span></div></div>';
+  document.getElementById('chat').appendChild(el);
+  scrollChat();
+  setSubTl('…', side);
+  doTranslate(text, prompt).then(function(result) {
+    var tling = el.querySelector('.msg-tling');
+    if (!tling) return;
+    var d = document.createElement('div');
+    d.className = 'msg-tl';
+    d.textContent = result;
+    tling.replaceWith(d);
+    setSubTl(result, side);
+    scrollChat();
+    if (!isMuted) enqueueTTS(result, ttsLang, d);
+  });
 }
 
 function stopAudio() {
-if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
 }
 
 function fetchTTS(text, lang) {
-return fetch(’/tts’, {
-method: ‘POST’,
-headers: {‘Content-Type’: ‘application/json’},
-body: JSON.stringify({text: text, lang: lang})
-}).then(function(res) {
-return res.text().then(function(raw) {
-if (!raw || !raw.trim()) throw new Error(‘TTS HTTP ’ + res.status + ’ 空回應’);
-var data = JSON.parse(raw);
-if (!res.ok) throw new Error(data.error || ’TTS HTTP ’ + res.status);
-if (!data.audioContent) throw new Error(‘TTS 無 audioContent’);
-return data.audioContent;
-});
-});
+  return fetch('/tts', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: text, lang: lang})
+  }).then(function(res) {
+    return res.text().then(function(raw) {
+      if (!raw || !raw.trim()) throw new Error('TTS HTTP ' + res.status + ' 空回應');
+      var data = JSON.parse(raw);
+      if (!res.ok) throw new Error(data.error || 'TTS HTTP ' + res.status);
+      if (!data.audioContent) throw new Error('TTS 無 audioContent');
+      return data.audioContent;
+    });
+  });
 }
 
 function playBase64MP3(base64, onEnd) {
-stopAudio();
-var audio = new Audio(‘data:audio/mp3;base64,’ + base64);
-currentAudio = audio;
-audio.onended = function() { currentAudio = null; onEnd(); };
-audio.onerror = function() { currentAudio = null; onEnd(); };
-audio.play().catch(function() { currentAudio = null; onEnd(); });
+  stopAudio();
+  var audio = new Audio('data:audio/mp3;base64,' + base64);
+  currentAudio = audio;
+  audio.onended = function() { currentAudio = null; onEnd(); };
+  audio.onerror = function() { currentAudio = null; onEnd(); };
+  audio.play().catch(function() { currentAudio = null; onEnd(); });
 }
 
 function enqueueTTS(text, lang, labelEl) {
-ttsQueue.push({text: text, lang: lang, labelEl: labelEl});
-if (!ttsBusy) drainTTS();
+  ttsQueue.push({text: text, lang: lang, labelEl: labelEl});
+  if (!ttsBusy) drainTTS();
 }
 
 function drainTTS() {
-if (!ttsQueue.length) {
-ttsBusy = false;
-if (!isLive) return;
-if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
-beginRec();
-return;
-}
-ttsBusy = true;
-killRec();
-var item = ttsQueue.shift();
-var text = item.text, lang = item.lang, labelEl = item.labelEl;
-if (labelEl) labelEl.classList.add(‘speaking’);
-fetchTTS(text, lang).then(function(b64) {
-playBase64MP3(b64, function() {
-if (labelEl) labelEl.classList.remove(‘speaking’);
-setTimeout(drainTTS, 100);
-});
-}).catch(function(err) {
-console.warn(‘Google TTS failed, fallback:’, err.message);
-if (labelEl) labelEl.classList.remove(‘speaking’);
-var utt = new SpeechSynthesisUtterance(text);
-utt.lang = lang; utt.rate = 0.92;
-var voices = speechSynthesis.getVoices();
-var voice = voices.filter(function(v){return v.lang===lang;})[0] ||
-voices.filter(function(v){return v.lang.indexOf(lang.split(’-’)[0])===0;})[0];
-if (voice) utt.voice = voice;
-utt.onend = function() { setTimeout(drainTTS, 100); };
-utt.onerror = function() { setTimeout(drainTTS, 100); };
-speechSynthesis.speak(utt);
-});
+  if (!ttsQueue.length) {
+    ttsBusy = false;
+    if (!isLive) return;
+    if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
+    beginRec();
+    return;
+  }
+  ttsBusy = true;
+  killRec();
+  var item = ttsQueue.shift();
+  var text = item.text, lang = item.lang, labelEl = item.labelEl;
+  if (labelEl) labelEl.classList.add('speaking');
+  fetchTTS(text, lang).then(function(b64) {
+    playBase64MP3(b64, function() {
+      if (labelEl) labelEl.classList.remove('speaking');
+      setTimeout(drainTTS, 100);
+    });
+  }).catch(function(err) {
+    console.warn('Google TTS failed, fallback:', err.message);
+    if (labelEl) labelEl.classList.remove('speaking');
+    var utt = new SpeechSynthesisUtterance(text);
+    utt.lang = lang; utt.rate = 0.92;
+    var voices = speechSynthesis.getVoices();
+    var voice = voices.filter(function(v){return v.lang===lang;})[0] ||
+                voices.filter(function(v){return v.lang.indexOf(lang.split('-')[0])===0;})[0];
+    if (voice) utt.voice = voice;
+    utt.onend = function() { setTimeout(drainTTS, 100); };
+    utt.onerror = function() { setTimeout(drainTTS, 100); };
+    speechSynthesis.speak(utt);
+  });
 }
 
 function doTranslate(text, prompt) {
-return fetch(’/translate’, {
-method: ‘POST’,
-headers: {‘Content-Type’: ‘application/json’},
-body: JSON.stringify({messages: [
-{role: ‘system’, content: ‘你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。’},
-{role: ‘user’, content: prompt + ‘\n\n’ + text}
-]})
-}).then(function(res) {
-return res.text().then(function(raw) {
-if (!raw || !raw.trim()) throw new Error(’HTTP ’ + res.status + ‘：空回應’);
-var data = JSON.parse(raw);
-if (!res.ok) throw new Error(data.error || ’HTTP ’ + res.status);
-var result = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-if (!result || !result.trim()) throw new Error(‘回傳格式錯誤’);
-return result.trim();
-});
-}).catch(function(err) {
-console.error(‘translate error:’, err);
-return ‘（錯誤：’ + err.message + ‘）’;
-});
+  return fetch('/translate', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({messages: [
+      {role: 'system', content: '你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。'},
+      {role: 'user', content: prompt + '\n\n' + text}
+    ]})
+  }).then(function(res) {
+    return res.text().then(function(raw) {
+      if (!raw || !raw.trim()) throw new Error('HTTP ' + res.status + '：空回應');
+      var data = JSON.parse(raw);
+      if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+      var result = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      if (!result || !result.trim()) throw new Error('回傳格式錯誤');
+      return result.trim();
+    });
+  }).catch(function(err) {
+    console.error('translate error:', err);
+    return '（錯誤：' + err.message + '）';
+  });
 }
 
 function updateLiveEl(side, text) {
-if (!liveEl || liveElSide !== side) {
-removeLiveEl();
-liveEl = document.createElement(‘div’);
-liveEl.className = ‘live-bubble ’ + side;
-liveEl.innerHTML = ‘<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>’;
-document.getElementById(‘chat’).appendChild(liveEl);
-liveElSide = side;
-}
-liveEl.querySelector(’.live-text’).textContent = text;
-scrollChat();
+  if (!liveEl || liveElSide !== side) {
+    removeLiveEl();
+    liveEl = document.createElement('div');
+    liveEl.className = 'live-bubble ' + side;
+    liveEl.innerHTML = '<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>';
+    document.getElementById('chat').appendChild(liveEl);
+    liveElSide = side;
+  }
+  liveEl.querySelector('.live-text').textContent = text;
+  scrollChat();
 }
 function removeLiveEl() { if (liveEl) { liveEl.remove(); liveEl = null; } }
-function setSubOrig(text) { clearTimeout(subTimer); document.getElementById(‘subOrig’).textContent = text; }
+function setSubOrig(text) { clearTimeout(subTimer); document.getElementById('subOrig').textContent = text; }
 function setSubTl(text, side) {
-var el = document.getElementById(‘subTl’);
-el.textContent = text;
-el.style.color = side===‘a’ ? ‘rgba(77,182,255,.9)’ : side===‘b’ ? ‘rgba(255,112,67,.9)’ : ‘rgba(255,255,255,.5)’;
+  var el = document.getElementById('subTl');
+  el.textContent = text;
+  el.style.color = side==='a' ? 'rgba(77,182,255,.9)' : side==='b' ? 'rgba(255,112,67,.9)' : 'rgba(255,255,255,.5)';
 }
 function fadeSubtitle() {
-subTimer = setTimeout(function() {
-document.getElementById(‘subOrig’).innerHTML = ‘<span class="sub-dim">字幕顯示於此</span>’;
-document.getElementById(‘subTl’).textContent = ‘’;
-}, 5000);
+  subTimer = setTimeout(function() {
+    document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
+    document.getElementById('subTl').textContent = '';
+  }, 5000);
 }
 function showPill(side) {
-clearTimeout(pillTimer);
-document.getElementById(‘pillA’).classList.remove(‘show’);
-document.getElementById(‘pillB’).classList.remove(‘show’);
-document.getElementById(‘pill’ + side.toUpperCase()).classList.add(‘show’);
-pillTimer = setTimeout(hidePills, 3000);
+  clearTimeout(pillTimer);
+  document.getElementById('pillA').classList.remove('show');
+  document.getElementById('pillB').classList.remove('show');
+  document.getElementById('pill' + side.toUpperCase()).classList.add('show');
+  pillTimer = setTimeout(hidePills, 3000);
 }
 function hidePills() {
-document.getElementById(‘pillA’).classList.remove(‘show’);
-document.getElementById(‘pillB’).classList.remove(‘show’);
+  document.getElementById('pillA').classList.remove('show');
+  document.getElementById('pillB').classList.remove('show');
 }
-function scrollChat() { var c = document.getElementById(‘chat’); c.scrollTop = c.scrollHeight; }
+function scrollChat() { var c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
 function clearChat() {
-document.getElementById(‘chat’).innerHTML = ‘<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>’;
-document.getElementById(‘subOrig’).innerHTML = ‘<span class="sub-dim">字幕顯示於此</span>’;
-document.getElementById(‘subTl’).textContent = ‘’;
-stopAudio(); ttsQueue = []; ttsBusy = false; pendingMode = null;
+  document.getElementById('chat').innerHTML = '<div class="chat-hint">按下開始按鈕<br>說中文 → 自動翻譯成目標語言<br>說目標語言 → 自動翻譯成中文</div>';
+  document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
+  document.getElementById('subTl').textContent = '';
+  stopAudio(); ttsQueue = []; ttsBusy = false; pendingMode = null;
 }
-function showWarn(msg) { var e = document.getElementById(‘warnBar’); e.textContent = msg; e.style.display = ‘block’; }
-function esc(s) { return s.replace(/&/g,’&’).replace(/</g,’<’).replace(/>/g,’>’); }
+function showWarn(msg) { var e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
-
 </body>
 </html>
