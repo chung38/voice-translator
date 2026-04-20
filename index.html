@@ -84,10 +84,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 <div class="app">
   <div class="top-bar">
     <div class="lang-tabs">
-      <button class="lang-tab active" data-lang="vi" onclick="setLang(this)">&#127989;&#65039; 越南語</button>
-      <button class="lang-tab" data-lang="th" onclick="setLang(this)">&#127988;&#65039; 泰語</button>
-      <button class="lang-tab" data-lang="id" onclick="setLang(this)">&#127990;&#65039; 印尼語</button>
-      <button class="lang-tab" data-lang="en" onclick="setLang(this)">&#127988;&#65039; 英語</button>
+      <button class="lang-tab active" data-lang="vi" onclick="setLang(this)">🇻🇳 越南語</button>
+      <button class="lang-tab" data-lang="th" onclick="setLang(this)">🇹🇭 泰語</button>
+      <button class="lang-tab" data-lang="id" onclick="setLang(this)">🇮🇩 印尼語</button>
+      <button class="lang-tab" data-lang="en" onclick="setLang(this)">🇬🇧 英語</button>
     </div>
   </div>
   <div class="chat" id="chat">
@@ -132,16 +132,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 </div>
 <script>
 var LANGS = {
-  vi: {label:'越南語', flag:'VN', srCode:'vi-VN', ttsLang:'vi-VN',
+  vi: {label:'越南語', srCode:'vi-VN', ttsLang:'vi-VN',
        toTarget:'將以下繁體中文翻譯成越南語，只輸出翻譯結果，不加任何說明。',
        toZh:'將以下越南語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
-  th: {label:'泰語', flag:'TH', srCode:'th-TH', ttsLang:'th-TH',
+  th: {label:'泰語', srCode:'th-TH', ttsLang:'th-TH',
        toTarget:'將以下繁體中文翻譯成泰語，只輸出翻譯結果，不加任何說明。',
        toZh:'將以下泰語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
-  id: {label:'印尼語', flag:'ID', srCode:'id-ID', ttsLang:'id-ID',
+  id: {label:'印尼語', srCode:'id-ID', ttsLang:'id-ID',
        toTarget:'將以下繁體中文翻譯成印尼語（Bahasa Indonesia），只輸出翻譯結果，不加任何說明。',
        toZh:'將以下印尼語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'},
-  en: {label:'英語', flag:'EN', srCode:'en-US', ttsLang:'en-US',
+  en: {label:'英語', srCode:'en-US', ttsLang:'en-US',
        toTarget:'將以下繁體中文翻譯成英語，只輸出翻譯結果，不加任何說明。',
        toZh:'將以下英語翻譯成繁體中文，只輸出翻譯結果，不加任何說明。'}
 };
@@ -231,7 +231,7 @@ function toggleSession() {
 }
 
 function startSession() {
-  isLive = true; srMode = 'zh'; overrideMode = null; pendingMode = null;
+  isLive = true; srMode = 'zh'; overrideMode = null; pendingMode = null; ttsBusy = false;
   document.getElementById('bigBtn').classList.add('live');
   document.getElementById('iconMic').style.display = 'none';
   document.getElementById('iconStop').style.display = '';
@@ -249,7 +249,8 @@ function startSession() {
 }
 
 function stopSession() {
-  isLive = false; pendingMode = null; killRec();
+  isLive = false; pendingMode = null; ttsBusy = false;
+  killRec();
   document.getElementById('bigBtn').classList.remove('live');
   document.getElementById('iconMic').style.display = '';
   document.getElementById('iconStop').style.display = 'none';
@@ -258,7 +259,7 @@ function stopSession() {
   document.getElementById('modeBar').style.display = 'none';
   document.getElementById('overrideRow').style.display = 'none';
   removeLiveEl(); hidePills(); fadeSubtitle();
-  stopAudio(); ttsQueue = []; ttsBusy = false;
+  stopAudio(); ttsQueue = [];
 }
 
 function killRec() {
@@ -281,19 +282,19 @@ function beginRec() {
 
   r.onresult = function(e) {
     if (!isLive) return;
-    var interim = '', final = '';
+    var interim = '', fin = '';
     for (var i = e.resultIndex; i < e.results.length; i++) {
       var t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) final += t; else interim += t;
+      if (e.results[i].isFinal) fin += t; else interim += t;
     }
-    var text = (final || interim).trim();
+    var text = (fin || interim).trim();
     if (!text) return;
-    if (!final) {
+    if (!fin) {
       updateLiveEl(srMode === 'zh' ? 'a' : 'b', text);
       setSubOrig(text);
       return;
     }
-    var detected = detectLang(final);
+    var detected = detectLang(fin);
     if (!detected) detected = (srMode === 'zh') ? 'zh' : 'target';
     var side = (detected === 'zh') ? 'a' : 'b';
     var isZh = (side === 'a');
@@ -301,8 +302,8 @@ function beginRec() {
     var ttsLang = isZh ? LANGS[currentLang].ttsLang : 'zh-TW';
     removeLiveEl();
     showPill(side);
-    setSubOrig(final);
-    commitMsg(side, final, prompt, ttsLang);
+    setSubOrig(fin);
+    commitMsg(side, fin, prompt, ttsLang);
     var next = detectLangNext(detected);
     if (next !== srMode) {
       if (ttsBusy) pendingMode = next;
@@ -342,7 +343,11 @@ function commitMsg(side, text, prompt, ttsLang) {
     tling.replaceWith(d);
     setSubTl(result, side);
     scrollChat();
-    if (!isMuted) enqueueTTS(result, ttsLang, d);
+    if (!isMuted) {
+      enqueueTTS(result, ttsLang, d);
+    }
+    // 若靜音，TTS 不執行，直接確保 SR 繼續
+    // （有 TTS 時由 drainTTS 負責重啟 SR）
   });
 }
 
@@ -380,36 +385,62 @@ function enqueueTTS(text, lang, labelEl) {
   if (!ttsBusy) drainTTS();
 }
 
+// ── drainTTS：所有結束路徑都必須呼叫 afterTTS() ──────────────────────────────
+function afterTTS() {
+  ttsBusy = false;
+  if (!isLive) return;
+  if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
+  beginRec();
+}
+
 function drainTTS() {
   if (!ttsQueue.length) {
-    ttsBusy = false;
-    if (!isLive) return;
-    if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
-    beginRec();
+    afterTTS();
     return;
   }
+
   ttsBusy = true;
-  killRec();
+  killRec(); // TTS 播放中停止辨識，避免收到自己的聲音
+
   var item = ttsQueue.shift();
   var text = item.text, lang = item.lang, labelEl = item.labelEl;
   if (labelEl) labelEl.classList.add('speaking');
+
+  function onTTSDone() {
+    if (labelEl) labelEl.classList.remove('speaking');
+    // 還有排隊的就繼續播，否則呼叫 afterTTS 恢復辨識
+    if (ttsQueue.length > 0) {
+      drainTTS();
+    } else {
+      afterTTS();
+    }
+  }
+
   fetchTTS(text, lang).then(function(b64) {
     playBase64MP3(b64, function() {
-      if (labelEl) labelEl.classList.remove('speaking');
-      setTimeout(drainTTS, 100);
+      setTimeout(onTTSDone, 100);
     });
   }).catch(function(err) {
+    // Google TTS 失敗 → fallback 到瀏覽器 TTS
     console.warn('Google TTS failed, fallback:', err.message);
-    if (labelEl) labelEl.classList.remove('speaking');
     var utt = new SpeechSynthesisUtterance(text);
-    utt.lang = lang; utt.rate = 0.92;
+    utt.lang = lang;
+    utt.rate = 0.92;
     var voices = speechSynthesis.getVoices();
-    var voice = voices.filter(function(v){return v.lang===lang;})[0] ||
-                voices.filter(function(v){return v.lang.indexOf(lang.split('-')[0])===0;})[0];
+    var voice = null;
+    for (var i=0; i<voices.length; i++) {
+      if (voices[i].lang === lang) { voice = voices[i]; break; }
+    }
+    if (!voice) {
+      var prefix = lang.split('-')[0];
+      for (var j=0; j<voices.length; j++) {
+        if (voices[j].lang.indexOf(prefix) === 0) { voice = voices[j]; break; }
+      }
+    }
     if (voice) utt.voice = voice;
-    utt.onend = function() { setTimeout(drainTTS, 100); };
-    utt.onerror = function() { setTimeout(drainTTS, 100); };
-    speechSynthesis.speak(utt);
+    utt.onend = function() { setTimeout(onTTSDone, 100); };
+    utt.onerror = function() { setTimeout(onTTSDone, 100); };
+    try { speechSynthesis.speak(utt); } catch(e) { setTimeout(onTTSDone, 100); }
   });
 }
 
@@ -423,7 +454,7 @@ function doTranslate(text, prompt) {
     ]})
   }).then(function(res) {
     return res.text().then(function(raw) {
-      if (!raw || !raw.trim()) throw new Error('HTTP ' + res.status + '：空回應');
+      if (!raw || !raw.trim()) throw new Error('HTTP ' + res.status + ' 空回應');
       var data = JSON.parse(raw);
       if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
       var result = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
