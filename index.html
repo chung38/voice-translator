@@ -395,21 +395,49 @@ function enqueueTTS(text, lang, labelEl) {
 
 function pickVoice(lang) {
   var voices = speechSynthesis.getVoices();
-  var voice = null;
-  for (var i=0; i<voices.length; i++) {
-    if (voices[i].lang === lang) { voice = voices[i]; break; }
-  }
-  if (!voice) {
-    var prefix = lang.split('-')[0];
-    for (var j=0; j<voices.length; j++) {
-      if (voices[j].lang.indexOf(prefix) === 0) { voice = voices[j]; break; }
+  if (!voices || !voices.length) return null;
+
+  var exact = [];
+  var prefix = [];
+  var prefNames = ['Google', 'Premium', 'Natural', 'Microsoft', 'WaveNet'];
+
+  var prefixCode = lang.split('-')[0];
+
+  for (var i = 0; i < voices.length; i++) {
+    var v = voices[i];
+    if (!v.lang) continue;
+    if (v.lang === lang) {
+      exact.push(v);
+    } else if (v.lang.indexOf(prefixCode) === 0) {
+      prefix.push(v);
     }
   }
-  return voice;
+
+  function pickBest(list) {
+    if (!list.length) return null;
+    // 優先選名字裡有高品質關鍵字的 voice
+    for (var i = 0; i < list.length; i++) {
+      var name = list[i].name || '';
+      for (var j = 0; j < prefNames.length; j++) {
+        if (name.indexOf(prefNames[j]) !== -1) {
+          return list[i];
+        }
+      }
+    }
+    // 沒有特別好的，就用第一個
+    return list[0];
+  }
+
+  var v = pickBest(exact);
+  if (!v) v = pickBest(prefix);
+  if (!v && voices.length) v = voices[0];
+
+  return v || null;
 }
 
 function speakWithBrowserTTS(text, lang, done) {
   var finished = false;
+
   function finish() {
     if (finished) return;
     finished = true;
@@ -417,6 +445,57 @@ function speakWithBrowserTTS(text, lang, done) {
     speechSynthesis.onvoiceschanged = null;
     done();
   }
+
+  function speakNow() {
+    try { speechSynthesis.cancel(); } catch(e) {}
+
+    var utt = new SpeechSynthesisUtterance(text);
+    utt.lang = lang;
+
+    // 依語言微調語速，讓可懂度比較好
+    if (lang === 'zh-TW') {
+      utt.rate = 0.95;
+    } else {
+      utt.rate = 0.9;
+    }
+    utt.pitch = 1.0;
+    utt.volume = 1.0;
+
+    var voice = pickVoice(lang);
+    if (voice) utt.voice = voice;
+
+    utt.onend = function() { setTimeout(finish, 100); };
+    utt.onerror = function() { setTimeout(finish, 100); };
+
+    try {
+      speechSynthesis.speak(utt);
+      // 防卡死保險
+      voiceLoadTimer = setTimeout(finish, 120000); // 最多播 120 秒
+    } catch(e) {
+      setTimeout(finish, 100);
+    }
+  }
+
+  var voices = speechSynthesis.getVoices();
+  if (voices && voices.length) {
+    speakNow();
+    return;
+  }
+
+  var waited = false;
+  speechSynthesis.onvoiceschanged = function() {
+    if (waited) return;
+    waited = true;
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+    speakNow();
+  };
+
+  voiceLoadTimer = setTimeout(function() {
+    if (waited) return;
+    waited = true;
+    speakNow();
+  }, 1200);
+}
 
   function speakNow() {
     try { speechSynthesis.cancel(); } catch(e) {}
@@ -469,10 +548,13 @@ function drainTTS() {
   }
 
   ttsBusy = true;
-  killRec();
+  killRec(); // 播放時先停掉辨識，避免干擾
 
   var item = ttsQueue.shift();
-  var text = item.text, lang = item.lang, labelEl = item.labelEl;
+  var text = item.text;
+  var lang = item.lang;
+  var labelEl = item.labelEl;
+
   if (labelEl) labelEl.classList.add('speaking');
 
   function onTTSDone() {
@@ -484,18 +566,11 @@ function drainTTS() {
     }
   }
 
-  fetchTTS(text, lang).then(function(b64) {
-    playBase64MP3(b64, function() {
-      setTimeout(onTTSDone, 100);
-    });
-  }).catch(function(err) {
-    console.warn('Google TTS failed, fallback:', err.message);
-    speakWithBrowserTTS(text, lang, function() {
-      setTimeout(onTTSDone, 100);
-    });
+  // 直接使用瀏覽器 TTS，不再呼叫後端 /tts
+  speakWithBrowserTTS(text, lang, function() {
+    setTimeout(onTTSDone, 100);
   });
 }
-
 function doTranslate(text, prompt) {
   return fetch('/translate', {
     method: 'POST',
