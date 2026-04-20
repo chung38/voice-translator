@@ -179,6 +179,7 @@ var liveElSide = 'a';
 var subTimer = null;
 var pillTimer = null;
 var currentAudio = null;
+var voiceLoadTimer = null;
 
 if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
 
@@ -260,6 +261,8 @@ function stopSession() {
   document.getElementById('overrideRow').style.display = 'none';
   removeLiveEl(); hidePills(); fadeSubtitle();
   stopAudio(); ttsQueue = [];
+  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+  try { speechSynthesis.cancel(); } catch(e) {}
 }
 
 function killRec() {
@@ -345,14 +348,19 @@ function commitMsg(side, text, prompt, ttsLang) {
     scrollChat();
     if (!isMuted) {
       enqueueTTS(result, ttsLang, d);
+    } else {
+      if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
+      if (isLive && !ttsBusy) beginRec();
     }
-    // 若靜音，TTS 不執行，直接確保 SR 繼續
-    // （有 TTS 時由 drainTTS 負責重啟 SR）
+  }).catch(function() {
+    if (pendingMode) { srMode = pendingMode; pendingMode = null; updateModeUI(); }
+    if (isLive && !ttsBusy) beginRec();
   });
 }
 
 function stopAudio() {
   if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+  try { speechSynthesis.cancel(); } catch(e) {}
 }
 
 function fetchTTS(text, lang) {
@@ -385,7 +393,68 @@ function enqueueTTS(text, lang, labelEl) {
   if (!ttsBusy) drainTTS();
 }
 
-// ── drainTTS：所有結束路徑都必須呼叫 afterTTS() ──────────────────────────────
+function pickVoice(lang) {
+  var voices = speechSynthesis.getVoices();
+  var voice = null;
+  for (var i=0; i<voices.length; i++) {
+    if (voices[i].lang === lang) { voice = voices[i]; break; }
+  }
+  if (!voice) {
+    var prefix = lang.split('-')[0];
+    for (var j=0; j<voices.length; j++) {
+      if (voices[j].lang.indexOf(prefix) === 0) { voice = voices[j]; break; }
+    }
+  }
+  return voice;
+}
+
+function speakWithBrowserTTS(text, lang, done) {
+  var finished = false;
+  function finish() {
+    if (finished) return;
+    finished = true;
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+    speechSynthesis.onvoiceschanged = null;
+    done();
+  }
+
+  function speakNow() {
+    try { speechSynthesis.cancel(); } catch(e) {}
+    var utt = new SpeechSynthesisUtterance(text);
+    utt.lang = lang;
+    utt.rate = 0.92;
+    var voice = pickVoice(lang);
+    if (voice) utt.voice = voice;
+    utt.onend = function() { setTimeout(finish, 100); };
+    utt.onerror = function() { setTimeout(finish, 100); };
+    try {
+      speechSynthesis.speak(utt);
+      voiceLoadTimer = setTimeout(finish, 5000);
+    } catch(e) {
+      setTimeout(finish, 100);
+    }
+  }
+
+  var voices = speechSynthesis.getVoices();
+  if (voices && voices.length) {
+    speakNow();
+    return;
+  }
+
+  var waited = false;
+  speechSynthesis.onvoiceschanged = function() {
+    if (waited) return;
+    waited = true;
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+    speakNow();
+  };
+  voiceLoadTimer = setTimeout(function() {
+    if (waited) return;
+    waited = true;
+    speakNow();
+  }, 1200);
+}
+
 function afterTTS() {
   ttsBusy = false;
   if (!isLive) return;
@@ -400,7 +469,7 @@ function drainTTS() {
   }
 
   ttsBusy = true;
-  killRec(); // TTS 播放中停止辨識，避免收到自己的聲音
+  killRec();
 
   var item = ttsQueue.shift();
   var text = item.text, lang = item.lang, labelEl = item.labelEl;
@@ -408,7 +477,6 @@ function drainTTS() {
 
   function onTTSDone() {
     if (labelEl) labelEl.classList.remove('speaking');
-    // 還有排隊的就繼續播，否則呼叫 afterTTS 恢復辨識
     if (ttsQueue.length > 0) {
       drainTTS();
     } else {
@@ -421,26 +489,10 @@ function drainTTS() {
       setTimeout(onTTSDone, 100);
     });
   }).catch(function(err) {
-    // Google TTS 失敗 → fallback 到瀏覽器 TTS
     console.warn('Google TTS failed, fallback:', err.message);
-    var utt = new SpeechSynthesisUtterance(text);
-    utt.lang = lang;
-    utt.rate = 0.92;
-    var voices = speechSynthesis.getVoices();
-    var voice = null;
-    for (var i=0; i<voices.length; i++) {
-      if (voices[i].lang === lang) { voice = voices[i]; break; }
-    }
-    if (!voice) {
-      var prefix = lang.split('-')[0];
-      for (var j=0; j<voices.length; j++) {
-        if (voices[j].lang.indexOf(prefix) === 0) { voice = voices[j]; break; }
-      }
-    }
-    if (voice) utt.voice = voice;
-    utt.onend = function() { setTimeout(onTTSDone, 100); };
-    utt.onerror = function() { setTimeout(onTTSDone, 100); };
-    try { speechSynthesis.speak(utt); } catch(e) { setTimeout(onTTSDone, 100); }
+    speakWithBrowserTTS(text, lang, function() {
+      setTimeout(onTTSDone, 100);
+    });
   });
 }
 
@@ -509,6 +561,7 @@ function clearChat() {
   document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
   document.getElementById('subTl').textContent = '';
   stopAudio(); ttsQueue = []; ttsBusy = false; pendingMode = null;
+  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
 }
 function showWarn(msg) { var e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
