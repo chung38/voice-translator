@@ -20,17 +20,21 @@ export async function onRequestPost(context) {
       });
     }
 
-    let languageCode = "cmn-TW";
-    let voiceName = "cmn-TW-Wavenet-A";
+    // 語音對照表：languageCode + voiceName + gender
+    const voiceMap = {
+      "zh-TW":  { languageCode: "cmn-TW", voiceName: "cmn-TW-Standard-A", gender: "FEMALE" },
+      "cmn-TW": { languageCode: "cmn-TW", voiceName: "cmn-TW-Standard-A", gender: "FEMALE" },
+      "vi-VN":  { languageCode: "vi-VN",  voiceName: "vi-VN-Wavenet-A",   gender: "FEMALE" },
+      "th-TH":  { languageCode: "th-TH",  voiceName: "th-TH-Standard-A",  gender: "FEMALE" },
+      "id-ID":  { languageCode: "id-ID",  voiceName: "id-ID-Wavenet-A",   gender: "FEMALE" },
+      "en-US":  { languageCode: "en-US",  voiceName: "en-US-Wavenet-F",   gender: "FEMALE" },
+    };
 
-    if (lang === "vi-VN") { languageCode = "vi-VN"; voiceName = "vi-VN-Wavenet-A"; }
-    else if (lang === "th-TH") { languageCode = "th-TH"; voiceName = "th-TH-Neural2-C"; }
-    else if (lang === "id-ID") { languageCode = "id-ID"; voiceName = "id-ID-Wavenet-A"; }
-    else if (lang === "en-US") { languageCode = "en-US"; voiceName = "en-US-Wavenet-F"; }
+    const voice = voiceMap[lang] || voiceMap["zh-TW"];
 
     const payload = JSON.stringify({
       input: { text: text },
-      voice: { languageCode: languageCode, name: voiceName, ssmlGender: "FEMALE" },
+      voice: { languageCode: voice.languageCode, name: voice.voiceName, ssmlGender: voice.gender },
       audioConfig: { audioEncoding: "MP3", speakingRate: 1.0, pitch: 0 },
     });
 
