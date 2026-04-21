@@ -27,7 +27,7 @@ export async function onRequestPost(context) {
       },
       body: JSON.stringify({
         model: 'deepseek-chat',
-        max_tokens: 500,
+        max_tokens: 200,
         messages: body.messages,
       }),
     });
