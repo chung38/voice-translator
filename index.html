@@ -67,18 +67,6 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .sw-btn.is-a{border-color:var(--a-color);color:var(--a-color)}
 .sw-btn.is-b{border-color:var(--b-color);color:var(--b-color)}
 .sw-btn.active-a.is-a,.sw-btn.active-b.is-b{color:#000}
-
-/* 語速調整列 */
-.rate-row{width:100%;display:flex;flex-direction:column;gap:6px}
-.rate-header{display:flex;justify-content:space-between;align-items:center}
-.rate-label{font-size:12px;color:var(--text-mid)}
-.rate-value{font-size:12px;color:var(--text);font-weight:600;min-width:32px;text-align:right}
-.rate-slider-wrap{display:flex;align-items:center;gap:8px}
-.rate-slider-wrap span{font-size:11px;color:var(--text-dim);white-space:nowrap}
-input[type=range].rate-slider{flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;background:var(--border);outline:none;cursor:pointer}
-input[type=range].rate-slider::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;background:var(--a-color);cursor:pointer;border:none}
-input[type=range].rate-slider::-moz-range-thumb{width:22px;height:22px;border-radius:50%;background:var(--a-color);cursor:pointer;border:none}
-
 .bottom-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;width:100%}
 .small-btn{flex:1;min-width:120px;background:none;border:1px solid var(--border);border-radius:12px;padding:12px 16px;font-size:14px;color:var(--text-mid);cursor:pointer;transition:all .2s;text-align:center}
 .small-btn:hover{border-color:#555;color:var(--text-mid)}
@@ -129,22 +117,6 @@ input[type=range].rate-slider::-moz-range-thumb{width:22px;height:22px;border-ra
       <button class="sw-btn is-a" id="swBtnA" onclick="setSpeaker('a')">🇹🇼 A 說中文</button>
       <button class="sw-btn is-b" id="swBtnB" onclick="setSpeaker('b')"><span id="swBtnBLabel">🌐 B 說外語</span></button>
     </div>
-
-    <!-- 語速調整 -->
-    <div class="rate-row">
-      <div class="rate-header">
-        <span class="rate-label" id="rateLabel">🔊 朗讀語速</span>
-        <span class="rate-value" id="rateDisplay">1.0×</span>
-      </div>
-      <div class="rate-slider-wrap">
-        <span>慢</span>
-        <input type="range" class="rate-slider" id="rateSlider"
-               min="0.5" max="1.8" step="0.05" value="1.0"
-               oninput="onRateChange(this.value)">
-        <span>快</span>
-      </div>
-    </div>
-
     <div class="bottom-actions">
       <button class="small-btn" id="muteBtn" onclick="toggleMute()">🔊 翻譯朗讀</button>
       <button class="small-btn" onclick="clearChat()">🗑 清除記錄</button>
@@ -183,16 +155,15 @@ var subTimer = null;
 var pillTimer = null;
 var voiceLoadTimer = null;
 
-// 語速：預設各語言
+// ── 各語言自然語速設定（移除滑桿，改由程式固定控制）──
+// 依語言特性調整：中文稍慢求清晰、英語略慢、泰/越南語放慢、印尼語適中
 var ttsRates = {
-  'zh-TW': 1.0,
-  'vi-VN': 1.0,
-  'th-TH': 1.0,
-  'id-ID': 1.0,
-  'en-US': 1.0
+  'zh-TW': 0.90,  // 中文：略慢，聽清楚每個字
+  'en-US': 0.95,  // 英語：接近自然，略保留停頓
+  'vi-VN': 0.85,  // 越南語：聲調語言，放慢更清晰
+  'th-TH': 0.82,  // 泰語：聲調最複雜，最慢
+  'id-ID': 0.88   // 印尼語：音節語言，適中略慢
 };
-// 滑桿控制「目前說話者」的語言語速
-var currentTTSLang = 'vi-VN'; // 預設跟著外語
 
 if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
 
@@ -200,23 +171,6 @@ if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環�
   if (speechSynthesis.getVoices().length) return;
   speechSynthesis.onvoiceschanged = function(){ speechSynthesis.onvoiceschanged = null; };
 })();
-
-// ── 語速滑桿 ─────────────────────────────
-function onRateChange(val) {
-  val = parseFloat(val);
-  ttsRates[currentTTSLang] = val;
-  document.getElementById('rateDisplay').textContent = val.toFixed(2).replace(/\.?0+$/,'') + '×';
-}
-
-function updateRateSlider(ttsLang) {
-  currentTTSLang = ttsLang;
-  var rate = ttsRates[ttsLang] || 1.0;
-  document.getElementById('rateSlider').value = rate;
-  document.getElementById('rateDisplay').textContent = rate.toFixed(2).replace(/\.?0+$/,'') + '×';
-  // 標籤顯示正在調哪個語言
-  var langNames = {'zh-TW':'中文','vi-VN':'越南語','th-TH':'泰語','id-ID':'印尼語','en-US':'英語'};
-  document.getElementById('rateLabel').textContent = '🔊 朗讀語速（' + (langNames[ttsLang]||ttsLang) + '）';
-}
 
 // ── 語言切換 ──────────────────────────────
 function setLang(el) {
@@ -227,7 +181,6 @@ function setLang(el) {
   var label = LANGS[currentLang].label;
   document.getElementById('pillB').textContent = '說話者 B ' + label;
   document.getElementById('swBtnBLabel').textContent = '🌐 B 說' + label;
-  updateRateSlider(LANGS[currentLang].ttsLang);
 }
 
 // ── 說話者切換 ────────────────────────────
@@ -235,9 +188,6 @@ function setSpeaker(side) {
   if (!isLive || ttsBusy) return;
   currentSpeaker = side;
   srMode = (side === 'a') ? 'zh' : 'target';
-  // 滑桿跟著切換到對應語言
-  var ttsLang = (side === 'a') ? 'zh-TW' : LANGS[currentLang].ttsLang;
-  updateRateSlider(ttsLang);
   updateSwitchUI();
   killRec();
   setTimeout(beginRec, 60);
@@ -287,8 +237,6 @@ function startSession() {
   document.getElementById('pillB').textContent = '說話者 B ' + label;
   var hint = document.getElementById('chat').querySelector('.chat-hint');
   if (hint) hint.remove();
-  // 開始時滑桿對應 A（中文）
-  updateRateSlider('zh-TW');
   updateSwitchUI();
   beginRec();
 }
@@ -409,36 +357,61 @@ function enqueueTTS(text, lang, labelEl) {
   if (!ttsBusy) drainTTS();
 }
 
+// ── 改良版 pickVoice：優先完整語碼 + 高品質名稱關鍵字 ──
 function pickVoice(lang) {
   var voices = speechSynthesis.getVoices();
-  if (!voices||!voices.length) return null;
-  var exact=[], prefix=[], preferred=['Google','Premium','Natural','Enhanced','Microsoft','WaveNet'];
-  var pc = lang.split('-')[0];
-  for (var i=0;i<voices.length;i++) {
-    var v=voices[i]; if (!v.lang) continue;
-    if (v.lang===lang) exact.push(v);
-    else if (v.lang.indexOf(pc)===0) prefix.push(v);
-  }
+  if (!voices || !voices.length) return null;
+
+  var langLower = lang.toLowerCase();
+  var pc = lang.split('-')[0].toLowerCase();
+
+  // 品質關鍵字：分兩級，優先度從高到低
+  var tier1 = ['wavenet','neural','premium','natural'];
+  var tier2 = ['google','microsoft','enhanced','online'];
+
   function score(v) {
-    var s=0, name=(v.name||'').toLowerCase(), fl=(v.lang||'').toLowerCase();
-    if (fl===lang.toLowerCase()) s+=100;
-    if (fl.indexOf(pc.toLowerCase())===0) s+=30;
-    if (v.localService===false) s+=10;
-    if (v.default) s+=8;
-    for (var j=0;j<preferred.length;j++) if (name.indexOf(preferred[j].toLowerCase())!==-1) s+=20;
-    if (name.indexOf('online')!==-1) s+=5;
-    if (name.indexOf('enhanced')!==-1) s+=5;
+    var s = 0;
+    var name = (v.name || '').toLowerCase();
+    var vl   = (v.lang || '').toLowerCase();
+
+    // 1. 完整語碼完全吻合（最高優先）
+    if (vl === langLower) s += 200;
+    // 2. 語碼前綴吻合（例如 zh 吻合 zh-TW / zh-CN）
+    else if (vl.indexOf(pc) === 0) s += 60;
+    // 若完全不含語系前綴，不加分（避免跨語系亂選）
+    else return -1;
+
+    // 3. 高品質第一層關鍵字
+    for (var i = 0; i < tier1.length; i++) {
+      if (name.indexOf(tier1[i]) !== -1) { s += 80; break; }
+    }
+    // 4. 高品質第二層關鍵字
+    for (var j = 0; j < tier2.length; j++) {
+      if (name.indexOf(tier2[j]) !== -1) { s += 40; break; }
+    }
+    // 5. 非本地語音（雲端）通常品質較好
+    if (v.localService === false) s += 20;
+    // 6. 系統預設 voice 加小分
+    if (v.default) s += 5;
+
     return s;
   }
-  function best(list) { if (!list.length) return null; list.sort(function(a,b){return score(b)-score(a);}); return list[0]; }
-  return best(exact)||best(prefix)||null;
+
+  var candidates = [];
+  for (var i = 0; i < voices.length; i++) {
+    var s = score(voices[i]);
+    if (s >= 0) candidates.push({v: voices[i], s: s});
+  }
+  if (!candidates.length) return null;
+  candidates.sort(function(a, b) { return b.s - a.s; });
+  return candidates[0].v;
 }
 
 function speakWithBrowserTTS(text, lang, done) {
   var finished = false;
   function finish() {
-    if (finished) return; finished=true;
-    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer=null; }
+    if (finished) return; finished = true;
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
     speechSynthesis.onvoiceschanged = null;
     done();
   }
@@ -446,99 +419,103 @@ function speakWithBrowserTTS(text, lang, done) {
     try { speechSynthesis.cancel(); } catch(e) {}
     try { speechSynthesis.resume(); } catch(e) {}
     var utt = new SpeechSynthesisUtterance(text);
-    // 使用使用者調整的語速
-    var rate = ttsRates[lang] || 1.0;
-    utt.lang = lang;
-    utt.rate = rate;
-    utt.pitch = 1.0;
+    // 使用各語言自然語速（程式內建，已移除滑桿）
+    utt.rate   = ttsRates[lang] || 0.9;
+    utt.lang   = lang;
+    utt.pitch  = 1.0;
     utt.volume = 1.0;
     var voice = pickVoice(lang);
     if (voice) utt.voice = voice;
-    utt.onstart = function() { if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer=null; } };
-    utt.onend = function() { setTimeout(finish,150); };
-    utt.onerror = function(e) { console.warn('TTS error:',e.error); setTimeout(finish,150); };
-    try { speechSynthesis.speak(utt); } catch(e) { setTimeout(finish,100); return; }
+    utt.onstart = function() {
+      if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+    };
+    utt.onend   = function() { setTimeout(finish, 150); };
+    utt.onerror = function(e) { console.warn('TTS error:', e.error); setTimeout(finish, 150); };
+    try { speechSynthesis.speak(utt); } catch(e) { setTimeout(finish, 100); return; }
     var ms = Math.max(6000, Math.min(90000, text.length * 300));
-    voiceLoadTimer = setTimeout(function() { try{speechSynthesis.cancel();}catch(e){} finish(); }, ms);
+    voiceLoadTimer = setTimeout(function() {
+      try { speechSynthesis.cancel(); } catch(e) {}
+      finish();
+    }, ms);
   }
   var voices = speechSynthesis.getVoices();
-  if (voices&&voices.length>0) { speakNow(); return; }
-  var waited=false;
+  if (voices && voices.length > 0) { speakNow(); return; }
+  var waited = false;
   speechSynthesis.onvoiceschanged = function() {
-    if (waited) return; waited=true;
-    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer=null; }
+    if (waited) return; waited = true;
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
     speakNow();
   };
   voiceLoadTimer = setTimeout(function() {
-    if (waited) return; waited=true;
-    speechSynthesis.onvoiceschanged=null;
+    if (waited) return; waited = true;
+    speechSynthesis.onvoiceschanged = null;
     speakNow();
   }, 1500);
 }
 
 function afterTTS() {
-  ttsBusy=false;
+  ttsBusy = false;
   if (!isLive) return;
   beginRec();
 }
 
 function drainTTS() {
   if (!ttsQueue.length) { afterTTS(); return; }
-  ttsBusy=true; killRec();
-  var item=ttsQueue.shift();
+  ttsBusy = true; killRec();
+  var item = ttsQueue.shift();
   if (item.labelEl) item.labelEl.classList.add('speaking');
   speakWithBrowserTTS(item.text, item.lang, function() {
     if (item.labelEl) item.labelEl.classList.remove('speaking');
-    setTimeout(function() { ttsQueue.length>0 ? drainTTS() : afterTTS(); }, 100);
+    setTimeout(function() { ttsQueue.length > 0 ? drainTTS() : afterTTS(); }, 100);
   });
 }
 
 // ── UI 工具 ───────────────────────────────
 function updateLiveEl(side, text) {
-  if (!liveEl||liveElSide!==side) {
+  if (!liveEl || liveElSide !== side) {
     removeLiveEl();
-    liveEl=document.createElement('div');
-    liveEl.className='live-bubble '+side;
-    liveEl.innerHTML='<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>';
+    liveEl = document.createElement('div');
+    liveEl.className = 'live-bubble ' + side;
+    liveEl.innerHTML = '<div class="micwave"><span></span><span></span><span></span></div><span class="live-text"></span>';
     document.getElementById('chat').appendChild(liveEl);
-    liveElSide=side;
+    liveElSide = side;
   }
-  liveEl.querySelector('.live-text').textContent=text;
+  liveEl.querySelector('.live-text').textContent = text;
   scrollChat();
 }
-function removeLiveEl() { if (liveEl) { liveEl.remove(); liveEl=null; } }
-function setSubOrig(text) { clearTimeout(subTimer); document.getElementById('subOrig').textContent=text; }
-function setSubTl(text,side) {
-  var el=document.getElementById('subTl');
-  el.textContent=text;
-  el.style.color=side==='a'?'rgba(77,182,255,.9)':side==='b'?'rgba(255,112,67,.9)':'rgba(255,255,255,.5)';
+function removeLiveEl() { if (liveEl) { liveEl.remove(); liveEl = null; } }
+function setSubOrig(text) { clearTimeout(subTimer); document.getElementById('subOrig').textContent = text; }
+function setSubTl(text, side) {
+  var el = document.getElementById('subTl');
+  el.textContent = text;
+  el.style.color = side==='a' ? 'rgba(77,182,255,.9)' : side==='b' ? 'rgba(255,112,67,.9)' : 'rgba(255,255,255,.5)';
 }
 function fadeSubtitle() {
-  subTimer=setTimeout(function(){
-    document.getElementById('subOrig').innerHTML='<span class="sub-dim">字幕顯示於此</span>';
-    document.getElementById('subTl').textContent='';
-  },5000);
+  subTimer = setTimeout(function(){
+    document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
+    document.getElementById('subTl').textContent = '';
+  }, 5000);
 }
 function showPill(side) {
   clearTimeout(pillTimer);
   document.getElementById('pillA').classList.remove('show');
   document.getElementById('pillB').classList.remove('show');
-  document.getElementById('pill'+side.toUpperCase()).classList.add('show');
-  pillTimer=setTimeout(hidePills,3000);
+  document.getElementById('pill' + side.toUpperCase()).classList.add('show');
+  pillTimer = setTimeout(hidePills, 3000);
 }
 function hidePills() {
   document.getElementById('pillA').classList.remove('show');
   document.getElementById('pillB').classList.remove('show');
 }
-function scrollChat() { var c=document.getElementById('chat'); c.scrollTop=c.scrollHeight; }
+function scrollChat() { var c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
 function clearChat() {
-  document.getElementById('chat').innerHTML='<div class="chat-hint">按下開始按鈕<br>選擇說話者後開始說話<br>說完後再切換說話者</div>';
-  document.getElementById('subOrig').innerHTML='<span class="sub-dim">字幕顯示於此</span>';
-  document.getElementById('subTl').textContent='';
-  stopAudio(); ttsQueue=[]; ttsBusy=false;
-  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer=null; }
+  document.getElementById('chat').innerHTML = '<div class="chat-hint">按下開始按鈕<br>選擇說話者後開始說話<br>說完後再切換說話者</div>';
+  document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
+  document.getElementById('subTl').textContent = '';
+  stopAudio(); ttsQueue = []; ttsBusy = false;
+  if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
 }
-function showWarn(msg) { var e=document.getElementById('warnBar'); e.textContent=msg; e.style.display='block'; }
+function showWarn(msg) { var e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>
