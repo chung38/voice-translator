@@ -2,10 +2,16 @@
 // 檔案路徑：functions/translate.js
 // 對應 URL：/translate（前端呼叫 /translate 即可）
 
+// 允許的來源（部署後請改為你的正式域名，例如 'https://your-app.pages.dev'）
+const ALLOWED_ORIGIN = '*';
+
+// 固定的 system prompt，不允許前端覆蓋
+const SYSTEM_PROMPT = '你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。';
+
 export async function onRequestPost(context) {
   const HEADERS = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   };
 
   try {
@@ -19,6 +25,35 @@ export async function onRequestPost(context) {
 
     const body = await context.request.json();
 
+    // ── 驗證 userText 格式（只接受純文字翻譯請求）──
+    const userText = body.text;
+    if (!userText || typeof userText !== 'string' || !userText.trim()) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid text' }),
+        { status: 400, headers: HEADERS }
+      );
+    }
+    if (userText.length > 500) {
+      return new Response(
+        JSON.stringify({ error: 'Text too long (max 500 chars)' }),
+        { status: 400, headers: HEADERS }
+      );
+    }
+
+    const prompt = body.prompt;
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid prompt' }),
+        { status: 400, headers: HEADERS }
+      );
+    }
+
+    // ── system prompt 由後端固定，前端無法覆蓋 ──
+    const messages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user',   content: prompt + '\n\n' + userText.trim() },
+    ];
+
     const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
@@ -27,8 +62,8 @@ export async function onRequestPost(context) {
       },
       body: JSON.stringify({
         model: 'deepseek-chat',
-        max_tokens: 200,
-        messages: body.messages,
+        max_tokens: 300,
+        messages,
       }),
     });
 
@@ -56,7 +91,7 @@ export async function onRequestOptions() {
   return new Response(null, {
     status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     },
