@@ -177,7 +177,7 @@ setInterval(function() {
   if (speechSynthesis.paused) {
     speechSynthesis.resume();
   }
-}, 20000);
+}, 10000);
 
 // ★ 修復三：切回頁面時自動檢查並恢復
 document.addEventListener('visibilitychange', function() {
@@ -382,10 +382,7 @@ function commitMsg(side, text, prompt, ttsLang) {
 function doTranslate(text, prompt) {
   return fetch('/translate', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({messages:[
-      {role:'system', content:'你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。'},
-      {role:'user', content:prompt+'\n\n'+text}
-    ]})
+    body: JSON.stringify({ text: text, prompt: prompt })
   }).then(function(res) {
     return res.text().then(function(raw) {
       if (!raw||!raw.trim()) throw new Error('HTTP '+res.status+' 空回應');
@@ -397,7 +394,6 @@ function doTranslate(text, prompt) {
     });
   }).catch(function(err) { console.error('translate error:',err); return '（錯誤：'+err.message+'）'; });
 }
-
 // ── TTS ───────────────────────────────────
 function stopAudio() { try { speechSynthesis.cancel(); } catch(e) {} }
 
@@ -467,7 +463,7 @@ function speakWithBrowserTTS(text, lang, done) {
     utt.onend   = function() { setTimeout(finish, 150); };
     utt.onerror = function(e) { console.warn('TTS error:', e.error); setTimeout(finish, 150); };
     try { speechSynthesis.speak(utt); } catch(e) { setTimeout(finish, 100); return; }
-    var ms = Math.max(6000, Math.min(90000, text.length * 300));
+    var ms = Math.max(8000, Math.min(30000, text.length * 200));
     voiceLoadTimer = setTimeout(function() {
       try { speechSynthesis.cancel(); } catch(e) {}
       finish();
@@ -510,7 +506,7 @@ function drainTTS() {
     if (item.labelEl) item.labelEl.classList.remove('speaking');
     ttsWatchdog = null;
     afterTTS();
-  }, 30000);
+  }, 15000);
 
   speakWithBrowserTTS(item.text, item.lang, function() {
     if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
