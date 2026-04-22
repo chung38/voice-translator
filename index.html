@@ -154,15 +154,15 @@ var liveElSide = 'a';
 var subTimer = null;
 var pillTimer = null;
 var voiceLoadTimer = null;
+var ttsWatchdog = null; // ★ watchdog 計時器
 
-// ── 各語言自然語速設定（移除滑桿，改由程式固定控制）──
-// 依語言特性調整：中文稍慢求清晰、英語略慢、泰/越南語放慢、印尼語適中
+// 各語言自然語速
 var ttsRates = {
-  'zh-TW': 0.95,  // 中文：略慢，聽清楚每個字
-  'en-US': 0.95,  // 英語：接近自然，略保留停頓
-  'vi-VN': 0.95,  // 越南語：聲調語言，放慢更清晰
-  'th-TH': 0.82,  // 泰語：聲調最複雜，最慢
-  'id-ID': 0.88   // 印尼語：音節語言，適中略慢
+  'zh-TW': 0.90,
+  'en-US': 0.95,
+  'vi-VN': 0.92,
+  'th-TH': 0.82,
+  'id-ID': 0.88
 };
 
 if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環境下執行');
@@ -171,6 +171,27 @@ if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環�
   if (speechSynthesis.getVoices().length) return;
   speechSynthesis.onvoiceschanged = function(){ speechSynthesis.onvoiceschanged = null; };
 })();
+
+// ★ 修復一：定期心跳，防止 speechSynthesis 在背景卡死
+setInterval(function() {
+  if (speechSynthesis.paused) {
+    speechSynthesis.resume();
+  }
+}, 20000);
+
+// ★ 修復三：切回頁面時自動檢查並恢復
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && isLive) {
+    try { speechSynthesis.resume(); } catch(e) {}
+    if (ttsBusy && !speechSynthesis.speaking && !speechSynthesis.pending) {
+      console.warn('visibilitychange: TTS stuck, force reset');
+      if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
+      ttsBusy = false;
+      ttsQueue = [];
+      beginRec();
+    }
+  }
+});
 
 // ── 語言切換 ──────────────────────────────
 function setLang(el) {
@@ -243,6 +264,7 @@ function startSession() {
 
 function stopSession() {
   isLive = false; ttsBusy = false;
+  if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
   killRec();
   document.getElementById('bigBtn').classList.remove('live');
   document.getElementById('iconMic').style.display = '';
@@ -361,11 +383,8 @@ function enqueueTTS(text, lang, labelEl) {
 function pickVoice(lang) {
   var voices = speechSynthesis.getVoices();
   if (!voices || !voices.length) return null;
-
   var langLower = lang.toLowerCase();
   var pc = lang.split('-')[0].toLowerCase();
-
-  // 品質關鍵字：分兩級，優先度從高到低
   var tier1 = ['wavenet','neural','premium','natural'];
   var tier2 = ['google','microsoft','enhanced','online'];
 
@@ -373,27 +392,17 @@ function pickVoice(lang) {
     var s = 0;
     var name = (v.name || '').toLowerCase();
     var vl   = (v.lang || '').toLowerCase();
-
-    // 1. 完整語碼完全吻合（最高優先）
     if (vl === langLower) s += 200;
-    // 2. 語碼前綴吻合（例如 zh 吻合 zh-TW / zh-CN）
     else if (vl.indexOf(pc) === 0) s += 60;
-    // 若完全不含語系前綴，不加分（避免跨語系亂選）
     else return -1;
-
-    // 3. 高品質第一層關鍵字
     for (var i = 0; i < tier1.length; i++) {
       if (name.indexOf(tier1[i]) !== -1) { s += 80; break; }
     }
-    // 4. 高品質第二層關鍵字
     for (var j = 0; j < tier2.length; j++) {
       if (name.indexOf(tier2[j]) !== -1) { s += 40; break; }
     }
-    // 5. 非本地語音（雲端）通常品質較好
     if (v.localService === false) s += 20;
-    // 6. 系統預設 voice 加小分
     if (v.default) s += 5;
-
     return s;
   }
 
@@ -419,7 +428,6 @@ function speakWithBrowserTTS(text, lang, done) {
     try { speechSynthesis.cancel(); } catch(e) {}
     try { speechSynthesis.resume(); } catch(e) {}
     var utt = new SpeechSynthesisUtterance(text);
-    // 使用各語言自然語速（程式內建，已移除滑桿）
     utt.rate   = ttsRates[lang] || 0.9;
     utt.lang   = lang;
     utt.pitch  = 1.0;
@@ -455,16 +463,30 @@ function speakWithBrowserTTS(text, lang, done) {
 
 function afterTTS() {
   ttsBusy = false;
+  if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
   if (!isLive) return;
   beginRec();
 }
 
+// ★ 修復二：drainTTS 加入 watchdog，防止 TTS 卡死讓麥克風永遠不恢復
 function drainTTS() {
   if (!ttsQueue.length) { afterTTS(); return; }
   ttsBusy = true; killRec();
   var item = ttsQueue.shift();
   if (item.labelEl) item.labelEl.classList.add('speaking');
+
+  // watchdog：30 秒內若 TTS 沒完成，強制重置
+  if (ttsWatchdog) clearTimeout(ttsWatchdog);
+  ttsWatchdog = setTimeout(function() {
+    console.warn('TTS watchdog triggered, force reset');
+    try { speechSynthesis.cancel(); } catch(e) {}
+    if (item.labelEl) item.labelEl.classList.remove('speaking');
+    ttsWatchdog = null;
+    afterTTS();
+  }, 30000);
+
   speakWithBrowserTTS(item.text, item.lang, function() {
+    if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
     if (item.labelEl) item.labelEl.classList.remove('speaking');
     setTimeout(function() { ttsQueue.length > 0 ? drainTTS() : afterTTS(); }, 100);
   });
@@ -513,6 +535,7 @@ function clearChat() {
   document.getElementById('subOrig').innerHTML = '<span class="sub-dim">字幕顯示於此</span>';
   document.getElementById('subTl').textContent = '';
   stopAudio(); ttsQueue = []; ttsBusy = false;
+  if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
   if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
 }
 function showWarn(msg) { var e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
