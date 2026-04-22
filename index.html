@@ -298,6 +298,8 @@ function beginRec() {
   r.interimResults = true;
   r.maxAlternatives = 1;
 
+  var lastInterim = ''; // ★ 暫存最後的 interim 文字
+
   r.onresult = function(e) {
     if (!isLive) return;
     var interim = '', fin = '';
@@ -307,7 +309,16 @@ function beginRec() {
     }
     var text = (fin || interim).trim();
     if (!text) return;
-    if (!fin) { updateLiveEl(currentSpeaker, text); setSubOrig(text); return; }
+
+    if (!fin) {
+      lastInterim = interim.trim(); // ★ 持續更新 interim 暫存
+      updateLiveEl(currentSpeaker, text);
+      setSubOrig(text);
+      return;
+    }
+
+    // 正常有 isFinal 的流程
+    lastInterim = '';
     var side = currentSpeaker;
     var isZh = (side === 'a');
     var prompt = isZh ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
@@ -324,12 +335,28 @@ function beginRec() {
   r.onend = function() {
     if (rec !== r) return;
     rec = null;
+
+    // ★ 備援：若有 interim 暫存但沒收到 isFinal，強制送出翻譯
+    if (isLive && lastInterim) {
+      var saved = lastInterim;
+      lastInterim = '';
+      var side = currentSpeaker;
+      var isZh = (side === 'a');
+      var prompt = isZh ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
+      var ttsLang = isZh ? LANGS[currentLang].ttsLang : 'zh-TW';
+      removeLiveEl(); showPill(side); setSubOrig(saved);
+      commitMsg(side, saved, prompt, ttsLang);
+      return;
+    }
+
+    lastInterim = '';
     if (!isLive || ttsBusy) return;
     setTimeout(beginRec, 80);
   };
 
   try { r.start(); } catch(e) { rec = null; if (isLive) setTimeout(beginRec, 500); }
 }
+
 
 // ── 訊息 & 翻譯 ───────────────────────────
 function commitMsg(side, text, prompt, ttsLang) {
