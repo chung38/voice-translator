@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>登入 — 即時對話翻譯</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;background:#0d0d0d;color:#efefef;font-family:'Noto Sans TC','Noto Sans',sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#181818;border:1px solid #2e2e2e;border-radius:16px;padding:36px 32px;width:100%;max-width:380px}
+h1{font-size:20px;font-weight:700;margin-bottom:6px;text-align:center}
+.sub{text-align:center;color:#666;font-size:13px;margin-bottom:28px}
+label{display:block;font-size:13px;color:#888;margin-bottom:6px}
+input{width:100%;background:#0d0d0d;border:1px solid #2e2e2e;border-radius:10px;padding:12px 14px;font-size:15px;color:#efefef;outline:none;transition:border-color .2s;margin-bottom:18px}
+input:focus{border-color:#4db6ff}
+.btn{width:100%;padding:13px;border-radius:10px;border:none;background:#4db6ff;color:#000;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.85}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.msg{margin-top:16px;padding:10px 14px;border-radius:8px;font-size:13px;text-align:center;display:none}
+.msg.err{background:rgba(255,80,80,.1);border:1px solid rgba(255,80,80,.3);color:#ff9090}
+.msg.ok{background:rgba(77,182,255,.1);border:1px solid rgba(77,182,255,.3);color:#4db6ff}
+.footer{text-align:center;margin-top:20px;font-size:13px;color:#555}
+.footer a{color:#4db6ff;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🎙 即時對話翻譯</h1>
+  <p class="sub">請登入以繼續使用</p>
+  <label for="u">帳號</label>
+  <input type="text" id="u" placeholder="輸入帳號" autocomplete="username">
+  <label for="p">密碼</label>
+  <input type="password" id="p" placeholder="輸入密碼" autocomplete="current-password">
+  <button class="btn" id="btn" onclick="doLogin()">登入</button>
+  <div class="msg" id="msg"></div>
+  <p class="footer">還沒有帳號？<a href="register.html">申請帳號</a></p>
+</div>
+<script>
+document.getElementById('p').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+
+async function doLogin() {
+  var btn = document.getElementById('btn');
+  var msgEl = document.getElementById('msg');
+  var u = document.getElementById('u').value.trim();
+  var p = document.getElementById('p').value;
+  if (!u || !p) { showMsg('請輸入帳號和密碼', 'err'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '登入中…';
+  hideMsg();
+
+  try {
+    var res = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || '登入失敗', 'err'); return; }
+
+    localStorage.setItem('vt_token', data.token);
+    localStorage.setItem('vt_username', data.username);
+    localStorage.setItem('vt_expires', data.expiresAt);
+    window.location.href = 'index.html';
+  } catch(err) {
+    showMsg('網路錯誤，請稍後再試', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '登入';
+  }
+}
+
+function showMsg(text, type) {
+  var el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  el.style.display = 'block';
+}
+function hideMsg() {
+  document.getElementById('msg').style.display = 'none';
+}
+</script>
+</body>
+</html>

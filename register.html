@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>申請帳號 — 即時對話翻譯</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;background:#0d0d0d;color:#efefef;font-family:'Noto Sans TC','Noto Sans',sans-serif;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#181818;border:1px solid #2e2e2e;border-radius:16px;padding:36px 32px;width:100%;max-width:380px}
+h1{font-size:20px;font-weight:700;margin-bottom:6px;text-align:center}
+.sub{text-align:center;color:#666;font-size:13px;margin-bottom:28px}
+label{display:block;font-size:13px;color:#888;margin-bottom:6px}
+input{width:100%;background:#0d0d0d;border:1px solid #2e2e2e;border-radius:10px;padding:12px 14px;font-size:15px;color:#efefef;outline:none;transition:border-color .2s;margin-bottom:18px}
+input:focus{border-color:#4db6ff}
+.hint{font-size:12px;color:#555;margin-top:-14px;margin-bottom:16px}
+.btn{width:100%;padding:13px;border-radius:10px;border:none;background:#4db6ff;color:#000;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .2s}
+.btn:hover{opacity:.85}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.msg{margin-top:16px;padding:10px 14px;border-radius:8px;font-size:13px;text-align:center;display:none}
+.msg.err{background:rgba(255,80,80,.1);border:1px solid rgba(255,80,80,.3);color:#ff9090}
+.msg.ok{background:rgba(80,200,120,.1);border:1px solid rgba(80,200,120,.3);color:#50c878}
+.footer{text-align:center;margin-top:20px;font-size:13px;color:#555}
+.footer a{color:#4db6ff;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📝 申請帳號</h1>
+  <p class="sub">審核通過後即可登入使用</p>
+  <label for="u">帳號</label>
+  <input type="text" id="u" placeholder="至少 3 個字元" autocomplete="username">
+  <label for="p">密碼</label>
+  <input type="password" id="p" placeholder="至少 6 個字元" autocomplete="new-password">
+  <p class="hint">建議使用英文加數字組合</p>
+  <label for="p2">確認密碼</label>
+  <input type="password" id="p2" placeholder="再輸入一次密碼">
+  <button class="btn" id="btn" onclick="doRegister()">送出申請</button>
+  <div class="msg" id="msg"></div>
+  <p class="footer">已有帳號？<a href="login.html">回到登入</a></p>
+</div>
+<script>
+async function doRegister() {
+  var btn = document.getElementById('btn');
+  var u = document.getElementById('u').value.trim();
+  var p = document.getElementById('p').value;
+  var p2 = document.getElementById('p2').value;
+
+  if (!u || u.length < 3) { showMsg('帳號至少 3 個字元', 'err'); return; }
+  if (!p || p.length < 6) { showMsg('密碼至少 6 個字元', 'err'); return; }
+  if (p !== p2) { showMsg('兩次密碼不一致', 'err'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '送出中…';
+  hideMsg();
+
+  try {
+    var res = await fetch('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || '註冊失敗', 'err'); return; }
+    showMsg('✅ ' + data.message, 'ok');
+    document.getElementById('u').value = '';
+    document.getElementById('p').value = '';
+    document.getElementById('p2').value = '';
+  } catch(err) {
+    showMsg('網路錯誤，請稍後再試', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '送出申請';
+  }
+}
+
+function showMsg(text, type) {
+  var el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  el.style.display = 'block';
+}
+function hideMsg() { document.getElementById('msg').style.display = 'none'; }
+</script>
+</body>
+</html>

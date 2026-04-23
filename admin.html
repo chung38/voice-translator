@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理員後台</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d0d0d;color:#efefef;font-family:'Noto Sans TC','Noto Sans',sans-serif;padding:20px;min-height:100vh}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:gap}
+h1{font-size:18px;font-weight:700}
+.auth-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.auth-row input{background:#181818;border:1px solid #2e2e2e;border-radius:8px;padding:8px 12px;font-size:13px;color:#efefef;outline:none;width:220px}
+.auth-row input:focus{border-color:#4db6ff}
+.btn-load{padding:8px 16px;border-radius:8px;border:none;background:#4db6ff;color:#000;font-size:13px;font-weight:700;cursor:pointer}
+.tabs{display:flex;gap:8px;margin-bottom:20px}
+.tab{padding:7px 18px;border-radius:20px;border:1px solid #2e2e2e;background:transparent;color:#888;font-size:13px;cursor:pointer;transition:all .2s}
+.tab.active{border-color:#4db6ff;color:#4db6ff;background:rgba(77,182,255,.1)}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:12px;color:#555;padding:8px 10px;border-bottom:1px solid #2e2e2e;font-weight:500}
+td{padding:10px 10px;border-bottom:1px solid #1e1e1e;font-size:14px;vertical-align:middle}
+.badge{display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge.pending{background:rgba(255,180,0,.12);color:#ffb400;border:1px solid rgba(255,180,0,.3)}
+.badge.active{background:rgba(80,200,120,.12);color:#50c878;border:1px solid rgba(80,200,120,.3)}
+.badge.disabled{background:rgba(255,80,80,.1);color:#ff9090;border:1px solid rgba(255,80,80,.3)}
+.action-btn{padding:5px 12px;border-radius:7px;border:none;font-size:12px;font-weight:600;cursor:pointer;transition:opacity .2s}
+.action-btn:hover{opacity:.8}
+.btn-approve{background:#50c878;color:#000}
+.btn-disable{background:#ff7043;color:#000}
+.btn-pending{background:#ffb400;color:#000}
+.msg{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
+.msg.ok{background:rgba(80,200,120,.1);border:1px solid rgba(80,200,120,.3);color:#50c878}
+.msg.err{background:rgba(255,80,80,.1);border:1px solid rgba(255,80,80,.3);color:#ff9090}
+.empty{text-align:center;color:#555;padding:40px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>⚙️ 使用者管理</h1>
+  <div class="auth-row">
+    <input type="password" id="secret" placeholder="管理員密鑰">
+    <button class="btn-load" onclick="loadUsers()">載入</button>
+  </div>
+</div>
+<div class="msg" id="msg"></div>
+<div class="tabs">
+  <button class="tab active" onclick="filterTab('all', this)">全部</button>
+  <button class="tab" onclick="filterTab('pending', this)">待審核</button>
+  <button class="tab" onclick="filterTab('active', this)">已啟用</button>
+  <button class="tab" onclick="filterTab('disabled', this)">已停用</button>
+</div>
+<table>
+  <thead>
+    <tr><th>帳號</th><th>狀態</th><th>申請時間</th><th>操作</th></tr>
+  </thead>
+  <tbody id="tbody"><tr><td colspan="4" class="empty">請輸入密鑰後載入</td></tr></tbody>
+</table>
+
+<script>
+var allUsers = [];
+var currentFilter = 'all';
+
+async function loadUsers() {
+  var secret = document.getElementById('secret').value.trim();
+  if (!secret) { showMsg('請輸入管理員密鑰', 'err'); return; }
+  try {
+    var res = await fetch('/admin/users', { headers: { 'X-Admin-Secret': secret } });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || '載入失敗', 'err'); return; }
+    allUsers = data;
+    renderTable();
+    showMsg('載入成功，共 ' + data.length + ' 筆', 'ok');
+  } catch(err) { showMsg('網路錯誤', 'err'); }
+}
+
+function renderTable() {
+  var list = currentFilter === 'all' ? allUsers : allUsers.filter(function(u){ return u.status === currentFilter; });
+  var tb = document.getElementById('tbody');
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="4" class="empty">沒有資料</td></tr>'; return; }
+  tb.innerHTML = list.map(function(u) {
+    var dt = new Date(u.created_at).toLocaleString('zh-TW');
+    var actions = '';
+    if (u.status !== 'active')   actions += '<button class="action-btn btn-approve" onclick="updateUser('+u.id+',\'active\')">啟用</button> ';
+    if (u.status !== 'disabled') actions += '<button class="action-btn btn-disable" onclick="updateUser('+u.id+',\'disabled\')">停用</button> ';
+    if (u.status !== 'pending')  actions += '<button class="action-btn btn-pending" onclick="updateUser('+u.id+',\'pending\')">重置待審</button>';
+    return '<tr><td>'+u.username+'</td><td><span class="badge '+u.status+'">'+statusLabel(u.status)+'</span></td><td>'+dt+'</td><td>'+actions+'</td></tr>';
+  }).join('');
+}
+
+async function updateUser(userId, status) {
+  var secret = document.getElementById('secret').value.trim();
+  try {
+    var res = await fetch('/admin/users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
+      body: JSON.stringify({ userId: userId, status: status })
+    });
+    var data = await res.json();
+    if (!res.ok) { showMsg(data.error || '更新失敗', 'err'); return; }
+    var u = allUsers.find(function(x){ return x.id === userId; });
+    if (u) u.status = status;
+    renderTable();
+    showMsg('更新成功', 'ok');
+  } catch(err) { showMsg('網路錯誤', 'err'); }
+}
+
+function filterTab(filter, el) {
+  currentFilter = filter;
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  renderTable();
+}
+
+function statusLabel(s) {
+  return s === 'pending' ? '待審核' : s === 'active' ? '已啟用' : '已停用';
+}
+
+function showMsg(text, type) {
+  var el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+  el.style.display = 'block';
+  setTimeout(function(){ el.style.display='none'; }, 4000);
+}
+</script>
+</body>
+</html>
