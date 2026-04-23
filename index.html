@@ -173,7 +173,7 @@ var liveElSide = 'a';
 var subTimer = null;
 var pillTimer = null;
 var voiceLoadTimer = null;
-var ttsWatchdog = null; // ★ watchdog 計時器
+var ttsWatchdog = null;
 
 // 各語言自然語速
 var ttsRates = {
@@ -191,12 +191,22 @@ if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環�
   speechSynthesis.onvoiceschanged = function(){ speechSynthesis.onvoiceschanged = null; };
 })();
 
-// ★ 修復一：定期心跳，防止 speechSynthesis 在背景卡死
+// ★ 修復一：定期心跳（5秒），防止 speechSynthesis 在背景卡死，並偵測 ttsBusy 卡住
 setInterval(function() {
   if (speechSynthesis.paused) {
     speechSynthesis.resume();
   }
-}, 10000);
+  // 若 ttsBusy 卡住但 TTS 已不在播放，強制重置
+  if (ttsBusy && !speechSynthesis.speaking && !speechSynthesis.pending) {
+    console.warn('heartbeat: TTS stuck detected, force reset');
+    try { speechSynthesis.cancel(); } catch(e) {}
+    if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
+    if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
+    ttsBusy = false;
+    ttsQueue = [];
+    if (isLive) setTimeout(beginRec, 100);
+  }
+}, 5000);
 
 // ★ 修復三：切回頁面時自動檢查並恢復
 document.addEventListener('visibilitychange', function() {
@@ -317,7 +327,7 @@ function beginRec() {
   r.interimResults = true;
   r.maxAlternatives = 1;
 
-  var lastInterim = ''; // ★ 暫存最後的 interim 文字
+  var lastInterim = '';
 
   r.onresult = function(e) {
     if (!isLive) return;
@@ -330,13 +340,12 @@ function beginRec() {
     if (!text) return;
 
     if (!fin) {
-      lastInterim = interim.trim(); // ★ 持續更新 interim 暫存
+      lastInterim = interim.trim();
       updateLiveEl(currentSpeaker, text);
       setSubOrig(text);
       return;
     }
 
-    // 正常有 isFinal 的流程
     lastInterim = '';
     var side = currentSpeaker;
     var isZh = (side === 'a');
@@ -355,7 +364,7 @@ function beginRec() {
     if (rec !== r) return;
     rec = null;
 
-    // ★ 備援：若有 interim 暫存但沒收到 isFinal，強制送出翻譯
+    // 備援：若有 interim 暫存但沒收到 isFinal，強制送出翻譯
     if (isLive && lastInterim) {
       var saved = lastInterim;
       lastInterim = '';
@@ -487,7 +496,8 @@ function speakWithBrowserTTS(text, lang, done) {
     utt.onend   = function() { setTimeout(finish, 150); };
     utt.onerror = function(e) { console.warn('TTS error:', e.error); setTimeout(finish, 150); };
     try { speechSynthesis.speak(utt); } catch(e) { setTimeout(finish, 100); return; }
-    var ms = Math.max(8000, Math.min(30000, text.length * 200));
+    // ★ 修正：縮短 TTS timeout，避免泰文等語言等待過久
+    var ms = Math.max(5000, Math.min(15000, text.length * 120));
     voiceLoadTimer = setTimeout(function() {
       try { speechSynthesis.cancel(); } catch(e) {}
       finish();
@@ -515,14 +525,13 @@ function afterTTS() {
   beginRec();
 }
 
-// ★ 修復二：drainTTS 加入 watchdog，防止 TTS 卡死讓麥克風永遠不恢復
+// ★ 修復二：drainTTS watchdog 縮短為 8 秒，防止 TTS 卡死讓麥克風永遠不恢復
 function drainTTS() {
   if (!ttsQueue.length) { afterTTS(); return; }
   ttsBusy = true; killRec();
   var item = ttsQueue.shift();
   if (item.labelEl) item.labelEl.classList.add('speaking');
 
-  // watchdog：30 秒內若 TTS 沒完成，強制重置
   if (ttsWatchdog) clearTimeout(ttsWatchdog);
   ttsWatchdog = setTimeout(function() {
     console.warn('TTS watchdog triggered, force reset');
@@ -530,7 +539,7 @@ function drainTTS() {
     if (item.labelEl) item.labelEl.classList.remove('speaking');
     ttsWatchdog = null;
     afterTTS();
-  }, 15000);
+  }, 8000);
 
   speakWithBrowserTTS(item.text, item.lang, function() {
     if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
