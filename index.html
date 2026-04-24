@@ -14,6 +14,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .lang-tabs{display:flex;gap:6px;flex:1;flex-wrap:wrap}
 .lang-tab{background:transparent;border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;color:var(--text-mid);transition:all .2s;white-space:nowrap}
 .lang-tab.active{border-color:var(--a-color);color:var(--a-color);background:var(--a-bg)}
+/* ── 使用者資訊列 ── */
+.user-bar{display:flex;align-items:center;gap:8px;padding:6px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;justify-content:flex-end}
+.user-name{font-size:12px;color:var(--text-mid);display:flex;align-items:center;gap:4px}
+.user-name svg{width:13px;height:13px;flex-shrink:0;opacity:.7}
+.logout-btn{font-size:11px;padding:3px 10px;border-radius:12px;border:1px solid var(--border);background:transparent;color:var(--text-mid);cursor:pointer;transition:all .2s;white-space:nowrap}
+.logout-btn:hover{border-color:#f55;color:#f55}
 .chat{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:10px;scroll-behavior:smooth}
 .chat::-webkit-scrollbar{width:4px}
 .chat::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
@@ -77,6 +83,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .pill.a{background:var(--a-bg);color:var(--a-color);border:1px solid var(--a-color)}
 .pill.b{background:var(--b-bg);color:var(--b-color);border:1px solid var(--b-color)}
 .pill.show{opacity:1}
+/* ── 429 toast ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:#2a1a1a;border:1px solid #f55;border-radius:10px;padding:9px 18px;font-size:13px;color:#ff9090;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;z-index:999}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
 </head>
 <body>
@@ -88,6 +97,17 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
       <button class="lang-tab" data-lang="id" onclick="setLang(this)">🇮🇩 印尼語</button>
       <button class="lang-tab" data-lang="en" onclick="setLang(this)">🇬🇧 英語</button>
     </div>
+  </div>
+  <!-- 使用者資訊列：顯示名稱 + 登出 -->
+  <div class="user-bar">
+    <span class="user-name">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="8" cy="5" r="3"/>
+        <path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5"/>
+      </svg>
+      <span id="usernameLabel">載入中…</span>
+    </span>
+    <button class="logout-btn" onclick="doLogout()">登出</button>
   </div>
   <div class="chat" id="chat">
     <div class="chat-hint">按下開始按鈕<br>選擇說話者後開始說話<br>說完後再切換說話者</div>
@@ -123,9 +143,12 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
     </div>
   </div>
 </div>
+<div class="toast" id="toastBar"></div>
 
 <script>
-// ── 登入驗證（頁面載入時執行）──────────────
+// ── 登入驗證 ──────────────────────────────
+var _currentUsername = localStorage.getItem('vt_username') || '';
+
 (async function checkAuth() {
   var token = localStorage.getItem('vt_token');
   if (!token) { window.location.href = 'login.html'; return; }
@@ -133,16 +156,32 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
     var res = await fetch('/auth/verify', {
       headers: { 'Authorization': 'Bearer ' + token }
     });
-    if (!res.ok) {
-      localStorage.removeItem('vt_token');
-      localStorage.removeItem('vt_username');
-      localStorage.removeItem('vt_expires');
-      window.location.href = 'login.html';
+    if (res.status === 401) { doLogout(); return; }
+    if (res.ok) {
+      var data = await res.json();
+      _currentUsername = data.username || _currentUsername;
+      localStorage.setItem('vt_username', _currentUsername);
+      renderUsername();
     }
   } catch(e) {
-    // 網路錯誤時不強制登出，讓使用者繼續（離線容錯）
+    // 網路錯誤時不強制登出（離線容錯），直接顯示快取名稱
+    renderUsername();
   }
 })();
+
+function renderUsername() {
+  var el = document.getElementById('usernameLabel');
+  if (el) el.textContent = _currentUsername || '未知使用者';
+}
+
+function doLogout() {
+  localStorage.removeItem('vt_token');
+  localStorage.removeItem('vt_username');
+  localStorage.removeItem('vt_expires');
+  window.location.href = 'login.html';
+}
+
+// ── 語言設定 ──────────────────────────────
 var LANGS = {
   vi:{label:'越南語',srCode:'vi-VN',ttsLang:'vi-VN',
       toTarget:'將以下繁體中文翻譯成越南語，只輸出翻譯結果，不加任何說明。',
@@ -175,7 +214,6 @@ var pillTimer = null;
 var voiceLoadTimer = null;
 var ttsWatchdog = null;
 
-// 各語言自然語速
 var ttsRates = {
   'zh-TW': 0.92,
   'en-US': 0.95,
@@ -191,14 +229,11 @@ if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環�
   speechSynthesis.onvoiceschanged = function(){ speechSynthesis.onvoiceschanged = null; };
 })();
 
-// ★ 修復一：定期心跳（5秒），防止 speechSynthesis 在背景卡死，並偵測 ttsBusy 卡住
+// 心跳：防止 speechSynthesis 背景卡死，並偵測 ttsBusy 卡住
 setInterval(function() {
-  if (speechSynthesis.paused) {
-    speechSynthesis.resume();
-  }
-  // 若 ttsBusy 卡住但 TTS 已不在播放，強制重置
+  if (speechSynthesis.paused) speechSynthesis.resume();
   if (ttsBusy && !speechSynthesis.speaking && !speechSynthesis.pending) {
-    console.warn('heartbeat: TTS stuck detected, force reset');
+    console.warn('heartbeat: TTS stuck, force reset');
     try { speechSynthesis.cancel(); } catch(e) {}
     if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
     if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
@@ -208,7 +243,6 @@ setInterval(function() {
   }
 }, 5000);
 
-// ★ 修復三：切回頁面時自動檢查並恢復
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible' && isLive) {
     try { speechSynthesis.resume(); } catch(e) {}
@@ -363,8 +397,6 @@ function beginRec() {
   r.onend = function() {
     if (rec !== r) return;
     rec = null;
-
-    // 備援：若有 interim 暫存但沒收到 isFinal，強制送出翻譯
     if (isLive && lastInterim) {
       var saved = lastInterim;
       lastInterim = '';
@@ -376,7 +408,6 @@ function beginRec() {
       commitMsg(side, saved, prompt, ttsLang);
       return;
     }
-
     lastInterim = '';
     if (!isLive || ttsBusy) return;
     setTimeout(beginRec, 80);
@@ -384,7 +415,6 @@ function beginRec() {
 
   try { r.start(); } catch(e) { rec = null; if (isLive) setTimeout(beginRec, 500); }
 }
-
 
 // ── 訊息 & 翻譯 ───────────────────────────
 function commitMsg(side, text, prompt, ttsLang) {
@@ -410,23 +440,31 @@ function commitMsg(side, text, prompt, ttsLang) {
 function doTranslate(text, prompt) {
   var token = localStorage.getItem('vt_token') || '';
   return fetch('/translate', {
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
       'Authorization': 'Bearer ' + token
     },
     body: JSON.stringify({ text: text, prompt: prompt })
   }).then(function(res) {
+    // Token 過期 → 自動登出
+    if (res.status === 401) { doLogout(); throw new Error('登入已過期'); }
+    // Rate limiting → 顯示提示，不登出
+    if (res.status === 429) { showToast('請求太頻繁，請稍候再說'); throw new Error('rate limit'); }
     return res.text().then(function(raw) {
-      if (!raw||!raw.trim()) throw new Error('HTTP '+res.status+' 空回應');
+      if (!raw || !raw.trim()) throw new Error('HTTP ' + res.status + ' 空回應');
       var data = JSON.parse(raw);
-      if (!res.ok) throw new Error(data.error||'HTTP '+res.status);
-      var result = data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content;
-      if (!result||!result.trim()) throw new Error('回傳格式錯誤');
+      if (!res.ok) throw new Error(data.error || 'HTTP ' + res.status);
+      var result = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      if (!result || !result.trim()) throw new Error('回傳格式錯誤');
       return result.trim();
     });
-  }).catch(function(err) { console.error('translate error:',err); return '（錯誤：'+err.message+'）'; });
+  }).catch(function(err) {
+    console.error('translate error:', err);
+    return '（錯誤：' + err.message + '）';
+  });
 }
+
 // ── TTS ───────────────────────────────────
 function stopAudio() { try { speechSynthesis.cancel(); } catch(e) {} }
 
@@ -435,7 +473,6 @@ function enqueueTTS(text, lang, labelEl) {
   if (!ttsBusy) drainTTS();
 }
 
-// ── 改良版 pickVoice：優先完整語碼 + 高品質名稱關鍵字 ──
 function pickVoice(lang) {
   var voices = speechSynthesis.getVoices();
   if (!voices || !voices.length) return null;
@@ -496,7 +533,6 @@ function speakWithBrowserTTS(text, lang, done) {
     utt.onend   = function() { setTimeout(finish, 150); };
     utt.onerror = function(e) { console.warn('TTS error:', e.error); setTimeout(finish, 150); };
     try { speechSynthesis.speak(utt); } catch(e) { setTimeout(finish, 100); return; }
-    // ★ 修正：縮短 TTS timeout，避免泰文等語言等待過久
     var ms = Math.max(5000, Math.min(15000, text.length * 120));
     voiceLoadTimer = setTimeout(function() {
       try { speechSynthesis.cancel(); } catch(e) {}
@@ -525,7 +561,6 @@ function afterTTS() {
   beginRec();
 }
 
-// ★ 修復二：drainTTS watchdog 縮短為 8 秒，防止 TTS 卡死讓麥克風永遠不恢復
 function drainTTS() {
   if (!ttsQueue.length) { afterTTS(); return; }
   ttsBusy = true; killRec();
@@ -595,6 +630,14 @@ function clearChat() {
   if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
 }
 function showWarn(msg) { var e = document.getElementById('warnBar'); e.textContent = msg; e.style.display = 'block'; }
+var _toastTimer = null;
+function showToast(msg) {
+  var t = document.getElementById('toastBar');
+  t.textContent = msg;
+  t.classList.add('show');
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+}
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 </script>
 </body>

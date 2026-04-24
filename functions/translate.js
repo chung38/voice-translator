@@ -1,7 +1,5 @@
-// Cloudflare Pages Function
-// 檔案路徑：functions/translate.js
-
-import { verifyToken, unauthorized } from './_shared/auth.js';
+// functions/translate.js
+import { verifyToken, unauthorized, checkRateLimit, tooManyRequests } from './_shared/auth.js';
 
 const ALLOWED_ORIGIN = '*';
 const SYSTEM_PROMPT = '你是專業翻譯員，只輸出翻譯結果，不加任何說明或解釋。';
@@ -12,9 +10,14 @@ const HEADERS = {
 };
 
 export async function onRequestPost(context) {
-  // ── Token 驗證 ──
   const user = await verifyToken(context.request, context.env.DB);
   if (!user) return unauthorized();
+
+  // Rate limiting
+  const auth = context.request.headers.get('Authorization') || '';
+  const token = auth.slice(7).trim();
+  const limited = await checkRateLimit(token, context.env.RATE_KV);
+  if (limited) return tooManyRequests();
 
   try {
     const DEEPSEEK_KEY = context.env.DEEPSEEK_API_KEY;
