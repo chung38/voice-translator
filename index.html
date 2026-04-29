@@ -229,11 +229,13 @@ if (!hasSR) showWarn('語音辨識需要 Chrome 或 Edge，且須在 HTTPS 環�
   speechSynthesis.onvoiceschanged = function(){ speechSynthesis.onvoiceschanged = null; };
 })();
 
-// 心跳：防止 speechSynthesis 背景卡死，並偵測 ttsBusy 卡住
+// 把原本的 setInterval 心跳改為：
 setInterval(function() {
   if (speechSynthesis.paused) speechSynthesis.resume();
-  if (ttsBusy && !speechSynthesis.speaking && !speechSynthesis.pending) {
-    console.warn('heartbeat: TTS stuck, force reset');
+  
+  // 【修復】pending 卡死也要清除，不只是 speaking
+  if (ttsBusy && !speechSynthesis.speaking) {
+    console.warn('heartbeat: TTS stuck (speaking=false), force reset');
     try { speechSynthesis.cancel(); } catch(e) {}
     if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
     if (voiceLoadTimer) { clearTimeout(voiceLoadTimer); voiceLoadTimer = null; }
@@ -242,16 +244,25 @@ setInterval(function() {
     if (isLive) setTimeout(beginRec, 100);
   }
 }, 5000);
-
 document.addEventListener('visibilitychange', function() {
   if (document.visibilityState === 'visible' && isLive) {
     try { speechSynthesis.resume(); } catch(e) {}
-    if (ttsBusy && !speechSynthesis.speaking && !speechSynthesis.pending) {
+    
+    // 【修復】不論 TTS 狀態，回到前台時先 kill 舊的 rec 再重新開始
+    if (!ttsBusy) {
+      console.log('visibilitychange: restarting SR after tab resume');
+      killRec();
+      setTimeout(beginRec, 300);
+    }
+    
+    // TTS 卡死處理保留
+    if (ttsBusy && !speechSynthesis.speaking) {
       console.warn('visibilitychange: TTS stuck, force reset');
       if (ttsWatchdog) { clearTimeout(ttsWatchdog); ttsWatchdog = null; }
       ttsBusy = false;
       ttsQueue = [];
-      beginRec();
+      killRec();
+      setTimeout(beginRec, 300);
     }
   }
 });
@@ -352,10 +363,16 @@ function killRec() {
 
 function beginRec() {
   if (!isLive || ttsBusy) return;
+
+  // 先清掉舊的 recognition，避免殘留狀態
   killRec();
+
   var langCode = (srMode === 'zh') ? 'zh-TW' : LANGS[currentLang].srCode;
   var r = new SRClass();
+
+  // 先賦值，避免 onend / start 失敗時出現競態
   rec = r;
+
   r.lang = langCode;
   r.continuous = false;
   r.interimResults = true;
@@ -364,12 +381,15 @@ function beginRec() {
   var lastInterim = '';
 
   r.onresult = function(e) {
-    if (!isLive) return;
+    if (!isLive || rec !== r) return;
+
     var interim = '', fin = '';
     for (var i = e.resultIndex; i < e.results.length; i++) {
       var t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) fin += t; else interim += t;
+      if (e.results[i].isFinal) fin += t;
+      else interim += t;
     }
+
     var text = (fin || interim).trim();
     if (!text) return;
 
@@ -385,35 +405,74 @@ function beginRec() {
     var isZh = (side === 'a');
     var prompt = isZh ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
     var ttsLang = isZh ? LANGS[currentLang].ttsLang : 'zh-TW';
-    removeLiveEl(); showPill(side); setSubOrig(fin);
+
+    removeLiveEl();
+    showPill(side);
+    setSubOrig(fin);
     commitMsg(side, fin, prompt, ttsLang);
   };
 
   r.onerror = function(e) {
-    if (e.error === 'not-allowed') { showWarn('麥克風權限被拒絕'); stopSession(); return; }
+    if (rec !== r) return;
+
+    if (e.error === 'not-allowed') {
+      showWarn('麥克風權限被拒絕');
+      stopSession();
+      return;
+    }
+
     console.warn('SR error:', e.error);
+
+    // 避免某些錯誤後 rec 殘留住
+    if (rec === r) rec = null;
+
+    if (isLive && !ttsBusy) {
+      setTimeout(beginRec, 500);
+    }
   };
 
   r.onend = function() {
+    // 只有目前這個實例才處理
     if (rec !== r) return;
+
+    // 先清掉 rec，避免下一次 start 時還以為舊的活著
     rec = null;
+
     if (isLive && lastInterim) {
       var saved = lastInterim;
       lastInterim = '';
+
       var side = currentSpeaker;
       var isZh = (side === 'a');
       var prompt = isZh ? LANGS[currentLang].toTarget : LANGS[currentLang].toZh;
       var ttsLang = isZh ? LANGS[currentLang].ttsLang : 'zh-TW';
-      removeLiveEl(); showPill(side); setSubOrig(saved);
+
+      removeLiveEl();
+      showPill(side);
+      setSubOrig(saved);
       commitMsg(side, saved, prompt, ttsLang);
       return;
     }
+
     lastInterim = '';
+
     if (!isLive || ttsBusy) return;
-    setTimeout(beginRec, 80);
+
+    setTimeout(beginRec, 120);
   };
 
-  try { r.start(); } catch(e) { rec = null; if (isLive) setTimeout(beginRec, 500); }
+  try {
+    r.start();
+  } catch(e) {
+    console.warn('SR start failed:', e);
+
+    // start 失敗時一定要把 rec 清掉，避免卡死
+    if (rec === r) rec = null;
+
+    if (isLive && !ttsBusy) {
+      setTimeout(beginRec, 500);
+    }
+  }
 }
 
 // ── 訊息 & 翻譯 ───────────────────────────
